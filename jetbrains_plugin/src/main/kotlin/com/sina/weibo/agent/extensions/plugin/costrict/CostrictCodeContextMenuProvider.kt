@@ -13,6 +13,7 @@ import com.sina.weibo.agent.extensions.ui.contextmenu.ExtensionContextMenuProvid
 import com.sina.weibo.agent.extensions.ui.contextmenu.ContextMenuConfiguration
 import com.sina.weibo.agent.extensions.ui.contextmenu.ContextMenuActionType
 import com.sina.weibo.agent.webview.WebViewManager
+import com.sina.weibo.agent.actions.executeCommand
 
 /**
  * Costrict extension context menu provider.
@@ -39,6 +40,7 @@ class CostrictCodeContextMenuProvider : ExtensionContextMenuProvider {
             FixLogicAction(),
             ImproveCodeAction(),
             AddToContextAction(),
+            CodeReviewAction(),
         )
     }
     
@@ -206,6 +208,32 @@ class CostrictCodeContextMenuProvider : ExtensionContextMenuProvider {
             args["endLine"] = effectiveRange.endLine + 1
             
             CostrictCodeContextMenuProvider.handleCodeAction("zgsm.newTask", "NEW_TASK", args, project)
+        }
+    }
+
+    /**
+     * Action to perform code review.
+     * Triggers code review command with the selected code.
+     */
+    class CodeReviewAction : AnAction("Code Review") {
+        private val logger: Logger = Logger.getInstance(CodeReviewAction::class.java)
+        
+        override fun actionPerformed(e: AnActionEvent) {
+            val project = e.project ?: return
+            val editor = e.getData(CommonDataKeys.EDITOR) ?: return
+            val file = e.dataContext.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
+            
+            val effectiveRange = CostrictCodeContextMenuProvider.getEffectiveRange(editor)
+            if (effectiveRange == null) return
+            
+            val args = mutableMapOf<String, Any?>()
+            args["filePath"] = file.path
+            args["selectedText"] = effectiveRange.text
+            args["startLine"] = effectiveRange.startLine + 1
+            args["endLine"] = effectiveRange.endLine + 1
+            
+            logger.info("🔍 Triggering code review with command: zgsm.codeReviewJetbrains")
+            executeCommand("zgsm.codeReviewJetbrains", project, args)
         }
     }
 

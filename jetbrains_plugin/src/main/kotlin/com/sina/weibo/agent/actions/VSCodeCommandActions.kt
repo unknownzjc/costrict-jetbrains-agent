@@ -44,7 +44,7 @@ fun executeCommand(commandId: String, project: Project?, vararg args: Any?, hasA
             return
         }
 
-        logger.info("🔍 Executing command via RPC: $commandId, argsCount=${args.size}")
+        logger.info("🔍 Executing command via RPC: $commandId, argsCount=${args.size}, args=${args.contentToString()}")
         if (hasArgs == true) {
             proxy.executeContributedCommand(commandId, args)
         } else {
