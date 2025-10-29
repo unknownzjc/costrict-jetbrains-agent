@@ -5,14 +5,13 @@
 package com.sina.weibo.agent.actors
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.sina.weibo.agent.comments.CommentManager
 import com.sina.weibo.agent.editor.EditorAndDocManager
 import com.sina.weibo.agent.editor.Range
 import com.sina.weibo.agent.editor.createURI
-import kotlinx.coroutines.delay
 import java.io.File
 
 /**
@@ -185,6 +184,8 @@ class MainThreadTextEditors(var project: Project) : MainThreadTextEditorsShape {
         handle?.let {
             val rang = createRanges(range)
             handle.revealRange(rang)
+            project.getService(CommentManager::class.java)
+                .ensureThreadsForRevealRange(id, rang)
         }
         return Unit
     }

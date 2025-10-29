@@ -205,7 +205,7 @@ class ServiceProxyRegistry private constructor() {
         val MainThreadLanguageModelTools = createProxyIdentifier<MainThreadLanguageModelToolsShape>("MainThreadLanguageModelTools")
         val MainThreadClipboard = createProxyIdentifier<MainThreadClipboardShape>("MainThreadClipboard")
         val MainThreadCommands = createProxyIdentifier<MainThreadCommandsShape>("MainThreadCommands")
-        val MainThreadComments = createProxyIdentifier<Any>("MainThreadComments")
+        val MainThreadComments = createProxyIdentifier<MainThreadCommentsShape>("MainThreadComments")
         val MainThreadConfiguration = createProxyIdentifier<MainThreadConfigurationShape>("MainThreadConfiguration")
         val MainThreadConsole = createProxyIdentifier<MainThreadConsoleShape>("MainThreadConsole")
         val MainThreadDebugService = createProxyIdentifier<MainThreadDebugServiceShape>("MainThreadDebugService")
@@ -343,4 +343,4 @@ class ServiceProxyRegistry private constructor() {
         val ExtHostLocalization = createProxyIdentifier<Any>("ExtHostLocalization")
         val ExtHostMcp = createProxyIdentifier<Any>("ExtHostMcp")
     }
-} 
+}
