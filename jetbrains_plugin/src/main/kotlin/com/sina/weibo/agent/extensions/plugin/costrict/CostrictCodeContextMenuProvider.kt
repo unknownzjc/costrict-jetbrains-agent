@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.sina.weibo.agent.comments.CommentManager
 import com.sina.weibo.agent.extensions.ui.contextmenu.ExtensionContextMenuProvider
 import com.sina.weibo.agent.extensions.ui.contextmenu.ContextMenuConfiguration
 import com.sina.weibo.agent.extensions.ui.contextmenu.ContextMenuActionType
@@ -231,6 +232,8 @@ class CostrictCodeContextMenuProvider : ExtensionContextMenuProvider {
             args["selectedText"] = effectiveRange.text
             args["startLine"] = effectiveRange.startLine + 1
             args["endLine"] = effectiveRange.endLine + 1
+
+            project.getService(CommentManager::class.java)?.clearAllThreads()
             
             logger.info("🔍 Triggering code review with command: zgsm.codeReviewJetbrains")
             executeCommand("zgsm.codeReviewJetbrains", project, args)

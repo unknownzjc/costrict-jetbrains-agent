@@ -5,9 +5,9 @@
 package com.sina.weibo.agent.util
 
 import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
 import kotlin.reflect.full.callSuspend
-import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.typeOf
+import kotlin.reflect.jvm.jvmErasure
 
 suspend fun doInvokeMethod(
     method: KFunction<*>,
@@ -24,26 +24,44 @@ suspend fun doInvokeMethod(
             // Argument is provided, handle type conversion
             val arg = realArgs[i]
             val paramType = parameterTypes[i]
+            val paramClass = paramType.type.jvmErasure
 
             // Handle type mismatch caused by serialization (e.g., int serialized as double)
             val convertedArg = when {
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Int>()) ->
+                arg is Double && paramClass == Int::class -> {
+                  
                     arg.toInt()
+                }
 
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Long>()) ->
+                arg is Double && paramClass == Long::class -> {
+                  
                     arg.toLong()
+                }
 
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Float>()) ->
+                arg is Double && paramClass == Float::class -> {
+                  
                     arg.toFloat()
+                }
 
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Short>()) ->
+                arg is Double && paramClass == Short::class -> {
+                  
                     arg.toInt().toShort()
+                }
 
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Byte>()) ->
+                arg is Double && paramClass == Byte::class -> {
+                   
                     arg.toInt().toByte()
+                }
 
-                arg is Double && paramType.type.isSubtypeOf(typeOf<Boolean>()) ->
+                arg is Double && paramClass == Boolean::class -> {
                     arg != 0.0
+                }
+
+                // Handle VSCode ExtensionIdentifier object that should be converted to String
+                arg is Map<*, *> && paramClass == String::class -> {
+                    val value = arg["value"]?.toString() ?: arg.toString()
+                    value
+                }
 
                 else -> arg
             }

@@ -6,6 +6,7 @@ package com.sina.weibo.agent.core
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.sina.weibo.agent.actors.*
 import com.sina.weibo.agent.ipc.IMessagePassingProtocol
 import com.sina.weibo.agent.ipc.proxy.IRPCProtocol
@@ -33,6 +34,7 @@ class RPCManager(
         setupDefaultProtocols()
         setupExtensionRequiredProtocols()
         setupWeCodeRequiredProtocols()
+        setupCostrictFuncitonProtocols()
         setupRooCodeFuncitonProtocols()
         setupKiloCodeFunctionProtocols()
         setupWebviewProtocols()
@@ -235,6 +237,17 @@ class RPCManager(
         rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadMessageService, MainThreadMessageService())
     }
 
+    private fun setupCostrictFuncitonProtocols() {
+        logger.info("Setting up protocol handlers required for Costrict specific functionality")
+
+        val mainThreadComments = MainThreadComments(project)
+        Disposer.register(project, mainThreadComments)
+        rpcProtocol.set(
+            ServiceProxyRegistry.MainContext.MainThreadComments,
+            mainThreadComments
+        )
+    }
+
     private fun setupRooCodeFuncitonProtocols() {
         logger.info("Setting up protocol handlers required for RooCode specific functionality")
 
@@ -264,4 +277,4 @@ class RPCManager(
     fun getRPCProtocol(): IRPCProtocol {
         return rpcProtocol
     }
-} 
+}
