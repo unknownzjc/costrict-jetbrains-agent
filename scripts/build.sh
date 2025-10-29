@@ -24,6 +24,7 @@ BUILD_TARGET="$TARGET_ALL"
 CLEAN_BEFORE_BUILD=false
 SKIP_TESTS=false
 OUTPUT_DIR=""
+BUILD_PLATFORM="all"
 
 # Show help for this script
 show_help() {
@@ -49,6 +50,7 @@ OPTIONS:
     -m, --mode MODE       Build mode: release (default) or debug
     -c, --clean           Clean before building
     -o, --output DIR      Output directory for build artifacts
+    -p, --platform PLATFORM   Build platform: all (default), windows, linux
     -t, --skip-tests      Skip running tests
     --vsix FILE           Use existing VSIX file (skip VSCode build)
     --skip-vscode         Skip VSCode extension build
@@ -64,7 +66,9 @@ BUILD MODES:
     debug       Development build with debug symbols and resources
 
 EXAMPLES:
-    $SCRIPT_NAME                           # Build all components
+    $SCRIPT_NAME                           # Build all components for all platforms
+    $SCRIPT_NAME --platform windows        # Build only for Windows platform
+    $SCRIPT_NAME --platform linux          # Build only for Linux platform
     $SCRIPT_NAME --mode debug              # Debug build
     $SCRIPT_NAME --clean vscode            # Clean build VSCode only
     $SCRIPT_NAME --vsix path/to/file.vsix  # Use existing VSIX
@@ -110,6 +114,14 @@ parse_build_args() {
                     exit 3
                 fi
                 OUTPUT_DIR="$2"
+                shift 2
+                ;;
+            -p|--platform)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "Platform requires a value"
+                    exit 3
+                fi
+                BUILD_PLATFORM="$2"
                 shift 2
                 ;;
             -t|--skip-tests)
@@ -180,6 +192,27 @@ parse_build_args() {
         *)
             log_error "Invalid build target: $BUILD_TARGET"
             log_info "Valid targets: $TARGET_ALL, $TARGET_VSCODE, $TARGET_BASE, $TARGET_IDEA"
+            exit 3
+            ;;
+    esac
+
+    # Validate build platform
+    case "$BUILD_PLATFORM" in
+        "all")
+            # Will build for all supported platforms
+            ;;
+        "windows")
+            BUILD_PLATFORM="windows-x64"
+            ;;
+        "linux")
+            BUILD_PLATFORM="linux-x64"
+            ;;
+        "windows-x64"|"linux-x64")
+            # Already in correct format
+            ;;
+        *)
+            log_error "Invalid build platform: $BUILD_PLATFORM"
+            log_info "Valid platforms: all, windows, linux"
             exit 3
             ;;
     esac
@@ -364,12 +397,29 @@ build_idea_component() {
         log_info "Skipping IDEA plugin build"
         return 0
     fi
-    
-    log_step "Building IDEA plugin..."
-    
-    build_idea_plugin
-    
-    log_success "IDEA plugin built"
+
+    if [[ "$BUILD_PLATFORM" == "all" ]]; then
+        log_step "Building IDEA plugin for all platforms..."
+        local supported_platforms=$(get_supported_platforms)
+        local built_files=()
+
+        for platform in $supported_platforms; do
+            log_info "Building IDEA plugin for platform: $platform"
+            build_idea_plugin "$platform"
+            if [[ -n "${IDEA_PLUGIN_FILE:-}" ]]; then
+                built_files+=("$IDEA_PLUGIN_FILE")
+            fi
+            log_success "IDEA plugin built for platform: $platform"
+        done
+
+        # Export all built files for summary
+        export MULTI_PLATFORM_BUILT_FILES="${built_files[*]}"
+    else
+        log_step "Building IDEA plugin for platform: $BUILD_PLATFORM..."
+        build_idea_plugin "$BUILD_PLATFORM"
+    fi
+
+    log_success "IDEA plugin build completed"
 }
 
 # Run tests
@@ -438,43 +488,59 @@ copy_build_artifacts() {
 # Show build summary
 show_build_summary() {
     log_step "Build Summary"
-    
+
     echo ""
     log_info "Build completed successfully!"
     log_info "Build mode: $BUILD_MODE"
     log_info "Build target: $BUILD_TARGET"
-    log_info "Platform: $(get_platform)"
-    
+    log_info "Build platform(s): $BUILD_PLATFORM"
+    log_info "Host platform: $(get_platform)"
+
     echo ""
     log_info "Generated artifacts:"
-    
+
     # Show VSIX file
     if [[ -n "$VSIX_FILE" && -f "$VSIX_FILE" ]]; then
         log_info "  VSCode Extension: $VSIX_FILE"
     fi
-    
-    # Show IDEA plugin
-    if [[ -n "${IDEA_PLUGIN_FILE:-}" && -f "$IDEA_PLUGIN_FILE" ]]; then
+
+    # Show IDEA plugins (single or multiple platforms)
+    if [[ "$BUILD_PLATFORM" == "all" && -n "${MULTI_PLATFORM_BUILT_FILES:-}" ]]; then
+        log_info "  IDEA Plugins (platform-specific):"
+        for plugin_file in $MULTI_PLATFORM_BUILT_FILES; do
+            if [[ -f "$plugin_file" ]]; then
+                log_info "    - $plugin_file"
+            fi
+        done
+    elif [[ -n "${IDEA_PLUGIN_FILE:-}" && -f "$IDEA_PLUGIN_FILE" ]]; then
         log_info "  IDEA Plugin: $IDEA_PLUGIN_FILE"
     fi
-    
+
     # Show debug resources
     if [[ "$BUILD_MODE" == "$BUILD_MODE_DEBUG" && -d "$PROJECT_ROOT/debug-resources" ]]; then
         log_info "  Debug Resources: $PROJECT_ROOT/debug-resources"
     fi
-    
+
     # Show output directory
     if [[ -n "$OUTPUT_DIR" ]]; then
         log_info "  Output Directory: $OUTPUT_DIR"
     fi
-    
+
+    echo ""
+    log_info "Node.js cache location: $NODEJS_CACHE_DIR"
+
     echo ""
     log_info "Next steps:"
     if [[ "$BUILD_TARGET" == "$TARGET_ALL" || "$BUILD_TARGET" == "$TARGET_IDEA" ]]; then
-        log_info "  1. Install IDEA plugin from: ${IDEA_PLUGIN_FILE:-$IDEA_BUILD_DIR/build/distributions/}"
-        log_info "  2. Configure plugin settings in IDEA"
+        if [[ "$BUILD_PLATFORM" == "all" ]]; then
+            log_info "  1. Install appropriate platform-specific IDEA plugin from: $IDEA_BUILD_DIR/build/distributions/"
+            log_info "  2. Choose plugin based on target platform (windows-x64 or linux-x64)"
+        else
+            log_info "  1. Install IDEA plugin from: ${IDEA_PLUGIN_FILE:-$IDEA_BUILD_DIR/build/distributions/}"
+            log_info "  2. Configure plugin settings in IDEA"
+        fi
     fi
-    
+
     echo ""
 }
 
@@ -495,6 +561,7 @@ main() {
     log_info "Build configuration:"
     log_info "  Mode: $BUILD_MODE"
     log_info "  Target: $BUILD_TARGET"
+    log_info "  Platform(s): $BUILD_PLATFORM"
     log_info "  Clean: $CLEAN_BEFORE_BUILD"
     log_info "  Skip tests: $SKIP_TESTS"
     [[ -n "$OUTPUT_DIR" ]] && log_info "  Output: $OUTPUT_DIR"

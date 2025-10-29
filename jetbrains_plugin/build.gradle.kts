@@ -307,6 +307,22 @@ tasks {
         password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
     }
 
+    // Configure platform-specific archive naming
+    buildPlugin {
+        val platform = providers.gradleProperty("targetPlatform").orElse("all").get()
+        val platformIdentifier = providers.gradleProperty("platformIdentifier").getOrElse("")
+        val version = providers.gradleProperty("pluginVersion").get()
+        val baseName = project.name
+
+        val archiveName = if (platform != "all" && platformIdentifier.isNotEmpty()) {
+            "${baseName}-${version}-${platformIdentifier}"
+        } else {
+            "${baseName}-${version}"
+        }
+
+        archiveFileName.set("${archiveName}.zip")
+    }
+
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
     }
