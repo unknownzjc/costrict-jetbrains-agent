@@ -29,13 +29,13 @@ SKIP_NODEJS_PREPARE=false
 readonly NODEJS_VERSION="20.6.0"
 BUILTIN_NODEJS_DIR=""  # Will be set in init_build_env()
 readonly NODEJS_DOWNLOAD_BASE_URL="https://nodejs.org/dist/v${NODEJS_VERSION}"
+# Node.js cache directory - shared across builds to avoid re-downloading
+readonly NODEJS_CACHE_DIR="$HOME/.nodejs-cache/${NODEJS_VERSION}"
 
 # Node.js platform mappings
 declare -A NODEJS_PLATFORMS=(
     ["windows-x64"]="node-v${NODEJS_VERSION}-win-x64.zip"
-    # ["macos-x64"]="node-v${NODEJS_VERSION}-darwin-x64.tar.gz"
-    # ["macos-arm64"]="node-v${NODEJS_VERSION}-darwin-arm64.tar.gz"
-    # ["linux-x64"]="node-v${NODEJS_VERSION}-linux-x64.tar.xz"
+    ["linux-x64"]="node-v${NODEJS_VERSION}-linux-x64.tar.xz"
 )
 
 # Initialize build environment
@@ -372,46 +372,56 @@ download_nodejs_binary() {
     local platform="$1"
     local filename="${NODEJS_PLATFORMS[$platform]}"
     local url="$NODEJS_DOWNLOAD_BASE_URL/$filename"
+    local cache_file="$NODEJS_CACHE_DIR/$filename"
     local target_dir="$BUILTIN_NODEJS_DIR/$platform"
     local target_file="$target_dir/$filename"
 
-    # Skip if already exists and valid
-    if [[ -f "$target_file" ]]; then
-        local file_size=$(stat -f%z "$target_file" 2>/dev/null || stat -c%s "$target_file" 2>/dev/null || echo "0")
+    # First check if file exists in cache
+    if [[ -f "$cache_file" ]]; then
+        local file_size=$(stat -f%z "$cache_file" 2>/dev/null || stat -c%s "$cache_file" 2>/dev/null || echo "0")
         local min_size=25000000  # 25MB (Windows zip is typically ~28MB)
 
         if [[ "$file_size" -gt "$min_size" ]]; then
-            log_debug "Node.js binary already exists for $platform (${file_size} bytes)"
+            log_info "Using cached Node.js binary for $platform from $cache_file"
+            ensure_dir "$target_dir"
+            execute_cmd "cp '$cache_file' '$target_file'" "copy Node.js binary from cache"
+            log_success "Copied Node.js binary for $platform from cache ($(( file_size / 1024 / 1024 ))MB)"
             return 0
         else
-            log_warn "Existing file is too small, re-downloading..."
-            rm -f "$target_file"
+            log_warn "Cached file is too small, removing and re-downloading..."
+            rm -f "$cache_file"
         fi
     fi
 
-    log_info "Downloading Node.js $NODEJS_VERSION for $platform..."
+    # If not in cache or cache file is invalid, download it
+    log_info "Downloading Node.js $NODEJS_VERSION for $platform (will cache for future builds)..."
 
-    ensure_dir "$target_dir"
+    # Ensure cache directory exists
+    ensure_dir "$NODEJS_CACHE_DIR"
 
-    # Download with progress
+    # Download to cache first
     if command_exists "curl"; then
-        execute_cmd "curl -L --progress-bar -o '$target_file' '$url'" "download Node.js $platform"
+        execute_cmd "curl -L --progress-bar -o '$cache_file' '$url'" "download Node.js $platform to cache"
     elif command_exists "wget"; then
-        execute_cmd "wget --show-progress -O '$target_file' '$url'" "download Node.js $platform"
+        execute_cmd "wget --show-progress -O '$cache_file' '$url'" "download Node.js $platform to cache"
     else
         die "Neither curl nor wget found for downloading Node.js"
     fi
 
-    # Verify download
-    local file_size=$(stat -f%z "$target_file" 2>/dev/null || stat -c%s "$target_file" 2>/dev/null || echo "0")
+    # Verify download in cache
+    local file_size=$(stat -f%z "$cache_file" 2>/dev/null || stat -c%s "$cache_file" 2>/dev/null || echo "0")
     local min_size=25000000  # 25MB (Windows zip is typically ~28MB)
 
     if [[ "$file_size" -lt "$min_size" ]]; then
-        remove_file "$target_file"
+        remove_file "$cache_file"
         die "Downloaded Node.js binary appears corrupted for $platform (size: $file_size bytes)"
     fi
 
-    log_success "Downloaded Node.js for $platform ($(( file_size / 1024 / 1024 ))MB)"
+    # Copy from cache to target directory
+    ensure_dir "$target_dir"
+    execute_cmd "cp '$cache_file' '$target_file'" "copy Node.js binary from cache to target"
+
+    log_success "Downloaded and cached Node.js for $platform ($(( file_size / 1024 / 1024 ))MB)"
 }
 
 # Download all Node.js binaries
@@ -441,16 +451,6 @@ generate_nodejs_config() {
       "extractPath": "node-v$NODEJS_VERSION-win-x64/",
       "executable": "node.exe"
     },
-    "macos-x64": {
-      "file": "node-v$NODEJS_VERSION-darwin-x64.tar.gz",
-      "extractPath": "node-v$NODEJS_VERSION-darwin-x64/bin/",
-      "executable": "node"
-    },
-    "macos-arm64": {
-      "file": "node-v$NODEJS_VERSION-darwin-arm64.tar.gz",
-      "extractPath": "node-v$NODEJS_VERSION-darwin-arm64/bin/",
-      "executable": "node"
-    },
     "linux-x64": {
       "file": "node-v$NODEJS_VERSION-linux-x64.tar.xz",
       "extractPath": "node-v$NODEJS_VERSION-linux-x64/bin/",
@@ -465,6 +465,54 @@ EOF
     fi
 
     log_success "Node.js configuration generated: $config_file"
+}
+
+# Generate Node.js configuration file for specific platform
+generate_nodejs_config_for_platform() {
+    local platform="$1"
+    log_step "Generating Node.js configuration for platform: $platform..."
+
+    local config_file="$BUILTIN_NODEJS_DIR/config.json"
+    local platform_config=""
+
+    # Generate platform-specific configuration
+    case "$platform" in
+        "windows-x64")
+            platform_config='
+    "windows-x64": {
+      "file": "node-v'$NODEJS_VERSION'-win-x64.zip",
+      "extractPath": "node-v'$NODEJS_VERSION'-win-x64/",
+      "executable": "node.exe"
+    }'
+            ;;
+        "linux-x64")
+            platform_config='
+    "linux-x64": {
+      "file": "node-v'$NODEJS_VERSION'-linux-x64.tar.xz",
+      "extractPath": "node-v'$NODEJS_VERSION'-linux-x64/bin/",
+      "executable": "node"
+    }'
+            ;;
+        *)
+            die "Unsupported platform for Node.js configuration: $platform"
+            ;;
+    esac
+
+    # Create JSON config using heredoc
+    cat > "$config_file" << EOF
+{
+  "version": "$NODEJS_VERSION",
+  "platforms": {
+$platform_config
+  }
+}
+EOF
+
+    if [[ ! -f "$config_file" ]]; then
+        die "Failed to generate Node.js configuration file for platform: $platform"
+    fi
+
+    log_success "Node.js configuration generated for $platform: $config_file"
 }
 
 # Prepare builtin Node.js before build (places files in src/main/resources)
@@ -486,7 +534,38 @@ prepare_builtin_nodejs_prebuild() {
     generate_nodejs_config
 
     log_success "Builtin Node.js prepared in resources directory: $BUILTIN_NODEJS_DIR"
-    
+
+    # Copy asset files (setup scripts) to resources directory
+    local asset_target_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
+    copy_asset_files "$asset_target_dir"
+}
+
+# Prepare builtin Node.js for specific platform
+prepare_builtin_nodejs_prebuild_for_platform() {
+    local target_platform="$1"
+
+    if [[ "$SKIP_NODEJS_PREPARE" == "true" ]]; then
+        log_info "Skipping Node.js pre-build preparation (SKIP_NODEJS_PREPARE=true)"
+        return 0
+    fi
+
+    log_step "Preparing builtin Node.js $NODEJS_VERSION for platform: $target_platform..."
+
+    # Use the standard BUILTIN_NODEJS_DIR (src/main/resources/builtin-nodejs)
+    ensure_dir "$BUILTIN_NODEJS_DIR"
+
+    if [[ "$target_platform" == "all" ]]; then
+        # Download all platforms for universal build
+        download_all_nodejs_binaries
+    else
+        # Download only specific platform
+        download_nodejs_binary "$target_platform"
+        # Generate config for single platform
+        generate_nodejs_config_for_platform "$target_platform"
+    fi
+
+    log_success "Builtin Node.js prepared for platform: $target_platform"
+
     # Copy asset files (setup scripts) to resources directory
     local asset_target_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
     copy_asset_files "$asset_target_dir"
@@ -559,30 +638,32 @@ clean_idea_resources_postbuild() {
 
 # Build IDEA plugin
 build_idea_plugin() {
+    local target_platform="${1:-all}"
+
     if [[ "$SKIP_IDEA_BUILD" == "true" ]]; then
         log_info "Skipping IDEA plugin build"
         return 0
     fi
-    
-    log_step "Building IDEA plugin..."
-    
+
+    log_step "Building IDEA plugin for platform: $target_platform..."
+
     cd "$IDEA_BUILD_DIR"
-    
+
     # Check for Gradle build files
     if [[ ! -f "build.gradle" && ! -f "build.gradle.kts" ]]; then
         die "No Gradle build file found in IDEA directory"
     fi
-    
+
     # Prepare builtin Node.js before building (so it gets packaged into the plugin)
-    prepare_builtin_nodejs_prebuild
-    
+    prepare_builtin_nodejs_prebuild_for_platform "$target_platform"
+
     # Use gradlew if available, otherwise use system gradle
     local gradle_cmd="gradle"
     if [[ -f "./gradlew" ]]; then
         gradle_cmd="./gradlew"
         chmod +x "./gradlew"
     fi
-    
+
     # Set debugMode based on BUILD_MODE
     local debug_mode="none"
     if [[ "$BUILD_MODE" == "$BUILD_MODE_RELEASE" ]]; then
@@ -592,21 +673,32 @@ build_idea_plugin() {
         debug_mode="idea"
         log_info "Building IDEA plugin in debug mode (debugMode=idea)"
     fi
-    
-    # Build plugin with debugMode property
-    execute_cmd "$gradle_cmd -PdebugMode=$debug_mode buildPlugin --info" "IDEA plugin build"
-    
+
+    # Set platform-specific Gradle properties
+    local gradle_props="-PdebugMode=$debug_mode"
+    if [[ "$target_platform" != "all" ]]; then
+        gradle_props="$gradle_props -PtargetPlatform=$target_platform"
+        local platform_identifier=$(get_platform_identifier "$target_platform")
+        gradle_props="$gradle_props -PplatformIdentifier=$platform_identifier"
+        log_info "Building with platform identifier: $platform_identifier"
+    else
+        gradle_props="$gradle_props -PtargetPlatform=all"
+    fi
+
+    # Build plugin with platform-specific properties
+    execute_cmd "$gradle_cmd $gradle_props buildPlugin --info" "IDEA plugin build"
+
     # Find generated plugin
     local plugin_file
     plugin_file=$(find "$IDEA_BUILD_DIR/build/distributions" \( -name "*.zip" -o -name "*.jar" \) -type f | sort -r | head -n 1)
-    
+
     if [[ -n "$plugin_file" ]]; then
         log_success "IDEA plugin built: $plugin_file"
         export IDEA_PLUGIN_FILE="$plugin_file"
     else
         log_warn "IDEA plugin file not found in build/distributions"
     fi
-    
+
     # Clean temporary resources after successful build
     clean_idea_resources_postbuild
 }
@@ -657,6 +749,78 @@ clean_build() {
     find /tmp -name "${TEMP_PREFIX}*" -type d -exec rm -rf {} + 2>/dev/null || true
     
     log_success "Build artifacts cleaned"
+}
+
+# Platform utility functions
+get_current_platform() {
+    local platform=""
+    local os_name=$(uname -s | tr '[:upper:]' '[:lower:]')
+    local arch_name=$(uname -m | tr '[:upper:]' '[:lower:]')
+
+    case "$os_name" in
+        mingw*|msys*|cygwin*)
+            platform="windows-x64"
+            ;;
+        linux*)
+            if [[ "$arch_name" == "x86_64" ]]; then
+                platform="linux-x64"
+            fi
+            ;;
+        darwin*)
+            if [[ "$arch_name" == "arm64" ]]; then
+                platform="macos-arm64"
+            elif [[ "$arch_name" == "x86_64" ]]; then
+                platform="macos-x64"
+            fi
+            ;;
+    esac
+
+    echo "$platform"
+}
+
+get_platform_identifier() {
+    local platform="$1"
+    case "$platform" in
+        "windows-x64")
+            echo "windows-x64"
+            ;;
+        "linux-x64")
+            echo "linux-x64"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+get_plugin_name_with_platform() {
+    local base_name="${1:-costrict}"
+    local version="$2"
+    local platform="$3"
+    local platform_identifier=$(get_platform_identifier "$platform")
+
+    if [[ -n "$version" && -n "$platform_identifier" && "$platform_identifier" != "unknown" ]]; then
+        echo "${base_name}-${version}-${platform_identifier}"
+    else
+        echo "${base_name}"
+    fi
+}
+
+get_supported_platforms() {
+    echo "windows-x64 linux-x64"
+}
+
+validate_platform() {
+    local platform="$1"
+    local supported_platforms=$(get_supported_platforms)
+
+    for supported in $supported_platforms; do
+        if [[ "$platform" == "$supported" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 # Cleanup build environment
