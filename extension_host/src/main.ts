@@ -4,9 +4,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { fork } from 'child_process';
+import * as fs from 'fs';
+import * as net from 'net';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import * as net from 'net';
 import { VSBuffer } from '../vscode/vs/base/common/buffer.js';
 import { NodeSocket } from '../vscode/vs/base/parts/ipc/node/ipc.net.js';
 import { PersistentProtocol } from '../vscode/vs/base/parts/ipc/common/ipc.net.js';
@@ -21,6 +23,18 @@ import { ExtensionManager } from './extensionManager.js';
 // Get current file directory path
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const LOGS_DIR = path.join(os.homedir(), '.run-vs-agent', 'logs');
+
+function ensureLogsDirectory(): void {
+    try {
+        fs.mkdirSync(LOGS_DIR, { recursive: true });
+    } catch (error) {
+        console.error('Failed to ensure logs directory:', error);
+    }
+}
+
+ensureLogsDirectory();
 
 // Create ExtensionManager instance and register extension
 const extensionManager = new ExtensionManager();
@@ -118,7 +132,7 @@ const server = net.createServer((socket) => {
                 },
                 logLevel: 0, // Info level
                 loggers: [],
-                logsLocation: URI.file(path.join(__dirname, 'logs')),
+                logsLocation: URI.file(LOGS_DIR),
                 autoStart: true,
                 consoleForward: {
                     includeStack: false,

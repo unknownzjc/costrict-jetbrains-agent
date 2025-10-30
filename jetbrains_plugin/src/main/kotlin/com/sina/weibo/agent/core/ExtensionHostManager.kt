@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import java.net.Socket
 import java.nio.channels.SocketChannel
+import java.nio.file.Files
 import java.nio.file.Paths
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.extensions.PluginId
@@ -259,6 +260,13 @@ class ExtensionHostManager : Disposable {
     private fun createInitData(): Map<String, Any?> {
         val pluginDir = getPluginDir()
         val basePath = projectPath
+        val logsDir = Paths.get(getUserConfigDir(), "logs")
+
+        try {
+            Files.createDirectories(logsDir)
+        } catch (e: Exception) {
+            LOG.warn("Failed to prepare logs directory: $logsDir", e)
+        }
         
         return mapOf(
             "commit" to "development",
@@ -310,7 +318,7 @@ class ExtensionHostManager : Disposable {
             ),
             "logLevel" to 0, // Info level
             "loggers" to emptyList<Any>(),
-            "logsLocation" to uriFromPath(Paths.get(pluginDir, "logs").toString()),
+            "logsLocation" to uriFromPath(logsDir.toString()),
             "autoStart" to true,
             "consoleForward" to mapOf(
                 "includeStack" to false,
