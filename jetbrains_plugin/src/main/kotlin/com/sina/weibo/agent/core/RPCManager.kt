@@ -147,6 +147,9 @@ class RPCManager(
         // MainThreadConfiguration
         rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadConfiguration, MainThreadConfiguration())
 
+        // MainThreadWorkspace
+        rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadWorkspace, project.getService(WorkspaceManager::class.java))
+
     }
 
     /**

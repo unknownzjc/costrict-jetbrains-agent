@@ -242,7 +242,7 @@ class ServiceProxyRegistry private constructor() {
         val MainThreadUrls = createProxyIdentifier<MainThreadUrlsShape>("MainThreadUrls")
         val MainThreadUriOpeners = createProxyIdentifier<Any>("MainThreadUriOpeners")
         val MainThreadProfileContentHandlers = createProxyIdentifier<Any>("MainThreadProfileContentHandlers")
-        val MainThreadWorkspace = createProxyIdentifier<Any>("MainThreadWorkspace")
+        val MainThreadWorkspace = createProxyIdentifier<MainThreadWorkspaceShape>("MainThreadWorkspace")
         val MainThreadFileSystem = createProxyIdentifier<MainThreadFileSystemShape>("MainThreadFileSystem")
         val MainThreadFileSystemEventService = createProxyIdentifier<MainThreadFileSystemEventServiceShape>("MainThreadFileSystemEventService")
         val MainThreadExtensionService = createProxyIdentifier<MainThreadExtensionServiceShape>("MainThreadExtensionService")

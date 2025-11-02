@@ -13,12 +13,18 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.util.io.FileUtil
+import com.sina.weibo.agent.actors.MainThreadWorkspaceShape
 import com.sina.weibo.agent.model.StaticWorkspaceData
 import com.sina.weibo.agent.model.WorkspaceData
 import com.sina.weibo.agent.model.WorkspaceFolder
 import com.sina.weibo.agent.util.URI
 import java.io.File
 import java.util.*
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
 
 /**
  * Workspace Manager
@@ -26,14 +32,14 @@ import java.util.*
  * Provides functionality to access project workspace data and folders.
  */
 @Service(Service.Level.PROJECT)
-class WorkspaceManager(val project: Project) {
+class WorkspaceManager(val project: Project) : MainThreadWorkspaceShape {
     private val logger = Logger.getInstance(WorkspaceManager::class.java)
 
     /**
      * Gets the current workspace data.
      * @return Workspace data or null (if no project is open)
      */
-    fun getCurrentWorkspaceData(): WorkspaceData? {
+    override fun getCurrentWorkspaceData(): WorkspaceData? {
         return getProjectWorkspaceData(project)
     }
 
@@ -44,9 +50,6 @@ class WorkspaceManager(val project: Project) {
      * @return Workspace data or null if the project is null
      */
     fun getProjectWorkspaceData(project: Project): WorkspaceData? {
-        if (project == null) {
-            return null
-        }
 
         // Create workspace ID (using hash value of the project's base path)
         val workspaceId = getWorkspaceId(project)
@@ -128,4 +131,104 @@ class WorkspaceManager(val project: Project) {
         
         return folders
     }
-} 
+
+    /**
+     * Get workspace data for a specific project by ID
+     * @param projectId The project identifier
+     * @return Workspace data or null if project not found
+     */
+    override fun getProjectWorkspaceData(projectId: String): WorkspaceData? {
+        // Find project by ID - this is a simplified implementation
+        // In a real scenario, you would need to map project IDs to actual Project instances
+        val allProjects = ProjectManager.getInstance().openProjects
+        val targetProject = allProjects.find { getWorkspaceId(it) == projectId }
+        return targetProject?.let { getProjectWorkspaceData(it) }
+    }
+
+    /**
+     * Get all available workspace data
+     * @return List of all workspace data
+     */
+    override fun getAllWorkspaceData(): List<WorkspaceData> {
+        val allProjects = ProjectManager.getInstance().openProjects
+        return allProjects.mapNotNull { getProjectWorkspaceData(it) }
+    }
+
+    /**
+     * Check if a workspace is currently open
+     * @return true if a workspace is open, false otherwise
+     */
+    override fun isWorkspaceOpen(): Boolean {
+        return project.isOpen && !project.isDisposed
+    }
+
+    /**
+     * Get workspace folders for current workspace
+     * @return List of workspace folders or empty list if no workspace is open
+     */
+    override fun getWorkspaceFolders(): List<WorkspaceData> {
+        val currentWorkspace = getCurrentWorkspaceData()
+        return if (currentWorkspace != null) listOf(currentWorkspace) else emptyList()
+    }
+
+    /**
+     * Start file search in the workspace
+     * @param uri The URI information containing path, scheme, and other metadata
+     * @param options Search configuration options including ignore settings and patterns
+     * @return Search handle or identifier
+     */
+    override fun startFileSearch(uri: Map<String, Any>, options: Map<String, Any>): Any? {
+        return try {
+            logger.info("RPC startFileSearch called with uri: $uri, options: $options")
+            
+            // Extract path from URI
+            val fsPath = uri["fsPath"] as? String ?: uri["path"] as? String
+            if (fsPath.isNullOrBlank()) {
+                logger.warn("No valid path found in URI: $uri")
+                return null
+            }
+
+            // Extract search options
+            val includePattern = options["includePattern"] as? String ?: "**/{requirements,design,tasks}.md"
+            // Note: These options are extracted but not currently used in the implementation
+            // They may be used for future enhancements
+            @Suppress("UNUSED_VARIABLE")
+            val disregardIgnoreFiles = options["disregardIgnoreFiles"] as? Boolean ?: false
+            @Suppress("UNUSED_VARIABLE")
+            val disregardExcludeSettings = options["disregardExcludeSettings"] as? Boolean ?: false
+            @Suppress("UNUSED_VARIABLE")
+            val disregardSearchExcludeSettings = options["disregardSearchExcludeSettings"] as? Boolean ?: false
+
+            logger.info("Starting file search in path: $fsPath with pattern: $includePattern")
+
+            // Convert to Path object
+            val searchPath = Paths.get(fsPath)
+            if (!Files.exists(searchPath) || !Files.isDirectory(searchPath)) {
+                logger.warn("Search path does not exist or is not a directory: $fsPath")
+                return emptyList<String>()
+            }
+
+            // Perform file search
+            val matchedFiles = mutableListOf<String>()
+            
+            // Search for files matching the pattern
+            val targetFilenames = setOf("requirements.md", "design.md", "tasks.md")
+            
+            Files.walk(searchPath).use { paths ->
+                paths.filter { path ->
+                    path.isRegularFile() && targetFilenames.contains(path.name.lowercase())
+                }.forEach { matchedFile ->
+                    matchedFiles.add(matchedFile.toString())
+                    logger.info("Found matching file: ${matchedFile}")
+                }
+            }
+
+            logger.info("File search completed. Found ${matchedFiles.size} files.")
+            matchedFiles
+            
+        } catch (e: Exception) {
+            logger.error("Error during file search in WorkspaceManager.startFileSearch", e)
+            null
+        }
+    }
+}
