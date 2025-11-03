@@ -18,6 +18,7 @@ import com.intellij.ui.jcef.JBCefApp
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.ide.BrowserUtil
 import com.sina.weibo.agent.actions.OpenDevToolsAction
+import com.sina.weibo.agent.core.ExtensionProcessManager
 import com.sina.weibo.agent.plugin.WecoderPlugin
 import com.sina.weibo.agent.plugin.WecoderPluginService
 import com.sina.weibo.agent.plugin.DEBUG_MODE
@@ -1145,6 +1146,13 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
         private fun updateConfigStatus(statusLabel: JLabel) {
             // Detect current theme for status colors
             val isDarkTheme = detectCurrentTheme()
+            val pluginService = WecoderPlugin.getInstance(project)
+            val lastFailure = pluginService.getLastInitializationFailure()
+            if (lastFailure != null) {
+                statusLabel.text = formatInitializationFailure(lastFailure)
+                statusLabel.foreground = getThemeAdaptiveColor(isDarkTheme, "error")
+                return
+            }
             
             if (configManager.isConfigurationLoaded()) {
                 if (configManager.isConfigurationValid()) {
@@ -1192,6 +1200,29 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
             }
         }
         
+        private fun formatInitializationFailure(failure: ExtensionProcessManager.StartFailure): String {
+            return when (failure.reason) {
+                ExtensionProcessManager.StartFailureReason.NODE_VERSION_TOO_LOW ->
+                    "❌ Node.js version too low - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.NODE_NOT_FOUND ->
+                    "❌ Node.js not found - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.NODE_SETUP_FAILED ->
+                    "❌ Node.js setup failed - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.EXTENSION_ENTRY_MISSING ->
+                    "❌ Extension entry missing - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.NODE_MODULES_MISSING ->
+                    "❌ Node modules missing - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.PROCESS_START_EXCEPTION ->
+                    "❌ Plugin start error - ${'$'}{failure.message}"
+                ExtensionProcessManager.StartFailureReason.NONE ->
+                    "⚠️ Plugin startup pending"
+            }
+        }
+
+        private fun shouldBlockAutoRestart(failure: ExtensionProcessManager.StartFailure?): Boolean {
+            return failure != null
+        }
+
         /**
          * Apply plugin selection and create configuration
          */
@@ -1205,7 +1236,7 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
                 // Verify configuration was saved successfully
                 if (configManager.isConfigurationValid()) {
                     // Start the plugin directly instead of just saving configuration
-                    startPluginAfterSelection(pluginId)
+                    startPluginAfterSelection(pluginId, true)
                     
                     logger.info("Plugin selection applied successfully: $pluginId")
                 } else {
@@ -1236,12 +1267,23 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
         /**
          * Start plugin after plugin selection
          */
-        private fun startPluginAfterSelection(pluginId: String) {
+        private fun startPluginAfterSelection(pluginId: String, triggeredByUser: Boolean) {
             try {
                 logger.info("Starting plugin after selection: $pluginId")
                 
+                val pluginService = WecoderPlugin.getInstance(project)
+                val lastFailure = pluginService.getLastInitializationFailure()
+                if (!triggeredByUser && shouldBlockAutoRestart(lastFailure)) {
+                    logger.warn("Skipping automatic restart due to previous failure: ${lastFailure?.reason}")
+                    updateConfigStatus(configStatusPanel.getComponent(0) as JLabel)
+                    return
+                }
+
                 // Set plugin starting state
                 isPluginStarting = true
+                if (triggeredByUser) {
+                    pluginService.clearLastInitializationFailure()
+                }
                 
                 // Update status to show plugin is starting
                 updateConfigStatus(configStatusPanel.getComponent(0) as JLabel)
@@ -1254,8 +1296,7 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
                 extensionManager.initializeCurrentProvider()
                 
                 // Start plugin service
-                val pluginService = WecoderPlugin.getInstance(project)
-                pluginService.initialize(project)
+                pluginService.initialize(project, forceRetry = triggeredByUser)
                 
                 // Initialize WebViewManager
                 val webViewManager = project.getService(WebViewManager::class.java)
@@ -1349,7 +1390,7 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
                         // Start plugin after configuration is set
                         ApplicationManager.getApplication().invokeLater {
                             if (!isPluginStarting && !isPluginRunning) {
-                                startPluginAfterSelection("costrict")
+                                startPluginAfterSelection("costrict", false)
                             }
                         }
                     } catch (e: Exception) {

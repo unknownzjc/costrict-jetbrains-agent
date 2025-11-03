@@ -6,7 +6,10 @@ package com.sina.weibo.agent.core
 
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.sina.weibo.agent.plugin.DEBUG_MODE
 import com.sina.weibo.agent.plugin.WecoderPluginService
@@ -54,6 +57,27 @@ class ExtensionProcessManager : Disposable {
     @Volatile
     private var isRunning = false
     
+    enum class StartFailureReason {
+        NONE,
+        NODE_NOT_FOUND,
+        NODE_SETUP_FAILED,
+        NODE_VERSION_TOO_LOW,
+        EXTENSION_ENTRY_MISSING,
+        NODE_MODULES_MISSING,
+        PROCESS_START_EXCEPTION
+    }
+    
+    data class StartFailure(val reason: StartFailureReason, val message: String)
+    
+    @Volatile
+    private var lastStartFailure: StartFailure? = null
+    
+    fun getLastFailure(): StartFailure? = lastStartFailure
+    
+    private fun recordFailure(reason: StartFailureReason, message: String) {
+        lastStartFailure = StartFailure(reason, message)
+    }
+    
     /**
      * Start extension process
      * @param portOrPath Socket server port (Int) or UDS path (String)
@@ -67,8 +91,10 @@ class ExtensionProcessManager : Disposable {
         val isUds = portOrPath is String
         if (!ExtensionUtils.isValidPortOrPath(portOrPath)) {
             LOG.error("Invalid socket info: $portOrPath")
+            recordFailure(StartFailureReason.PROCESS_START_EXCEPTION, "Invalid socket info: $portOrPath")
             return false
         }
+        lastStartFailure = null
         
         try {
             // Prepare Node.js executable path
@@ -98,6 +124,10 @@ class ExtensionProcessManager : Disposable {
                 if (nodePath == null) {
                     LOG.error("Failed to find Node.js executable even after running setup script")
                     
+                    recordFailure(
+                        StartFailureReason.NODE_NOT_FOUND,
+                        "Failed to locate Node.js. Please install version $MIN_REQUIRED_NODE_VERSION or higher."
+                    )
                     NotificationUtil.showError(
                         "Node.js environment missing",
                         "Failed to setup Node.js automatically. Please install Node.js manually and try again. Recommended version: $MIN_REQUIRED_NODE_VERSION or higher."
@@ -112,9 +142,13 @@ class ExtensionProcessManager : Disposable {
             if (!NodeVersionUtil.isVersionSupported(nodeVersion, MIN_REQUIRED_NODE_VERSION)) {
                 LOG.error("Node.js version is not supported: $nodeVersion, required: $MIN_REQUIRED_NODE_VERSION")
 
-                NotificationUtil.showError(
-                    "Node.js version too low",
-                    "Current Node.js($nodePath) version is $nodeVersion, please upgrade to $MIN_REQUIRED_NODE_VERSION or higher for better compatibility."
+                recordFailure(
+                    StartFailureReason.NODE_VERSION_TOO_LOW,
+                    "Detected Node.js $nodeVersion at $nodePath. Minimum required version is $MIN_REQUIRED_NODE_VERSION."
+                )
+                showBlockingErrorDialog(
+                    "Node.js 版本过低",
+                    "当前 Node.js ($nodePath) 版本为 $nodeVersion, CoStrict 支持的最低版本为 $MIN_REQUIRED_NODE_VERSION, 请升级到 $MIN_REQUIRED_NODE_VERSION 或更高版本以获得更好的兼容性."
                 )
                 
                 return false
@@ -124,12 +158,20 @@ class ExtensionProcessManager : Disposable {
             val extensionPath = findExtensionEntryFile()
             if (extensionPath == null) {
                 LOG.error("Failed to find extension entry file")
+                recordFailure(
+                    StartFailureReason.EXTENSION_ENTRY_MISSING,
+                    "Extension entry file ($EXTENSION_ENTRY_FILE) could not be located."
+                )
                 return false
             }
 
             val nodeModulesPath = findNodeModulesPath()
             if (nodeModulesPath == null) {
                 LOG.error("Failed to find node_modules directory")
+                recordFailure(
+                    StartFailureReason.NODE_MODULES_MISSING,
+                    "Node modules directory ($NODE_MODULES_PATH) is missing or unreadable."
+                )
                 return false
             }
             
@@ -204,9 +246,14 @@ class ExtensionProcessManager : Disposable {
             
             isRunning = true
             LOG.info("Extension process started")
+            lastStartFailure = null
             return true
         } catch (e: Exception) {
             LOG.error("Failed to start extension process", e)
+            recordFailure(
+                StartFailureReason.PROCESS_START_EXCEPTION,
+                "Unexpected error starting extension process: ${e.message ?: "unknown"}"
+            )
             stopInternal()
             return false
         }
@@ -308,6 +355,30 @@ class ExtensionProcessManager : Disposable {
         isRunning = false
         
         LOG.info("Extension process stopped")
+    }
+    
+    private fun showBlockingErrorDialog(title: String, message: String) {
+        val application = ApplicationManager.getApplication()
+        if (application == null || application.isDisposed || application.isHeadlessEnvironment) {
+            LOG.warn("Application context unavailable, fallback to notification: $title")
+            NotificationUtil.showError(title, message)
+            return
+        }
+
+        val dialogTask = Runnable {
+            Messages.showMessageDialog(
+                /* project = */ null,
+                message,
+                title,
+                Messages.getErrorIcon()
+            )
+        }
+
+        if (application.isDispatchThread) {
+            dialogTask.run()
+        } else {
+            application.invokeAndWait(dialogTask, ModalityState.any())
+        }
     }
     
     /**
