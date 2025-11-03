@@ -258,6 +258,12 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
     // Plugin initialization complete flag
     private val initializationComplete = CompletableFuture<Boolean>()
     
+    @Volatile
+    private var lastInitializationFailure: ExtensionProcessManager.StartFailure? = null
+    
+    @Volatile
+    private var isInitializationInProgress = false
+    
     // Coroutine scope
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -328,10 +334,18 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
     /**
      * Initialize plugin service
      */
-    fun initialize(project: Project) {
+    fun initialize(project: Project, forceRetry: Boolean = false) {
         // DEBUG_MODE is no longer set directly in code, now read from config file
         if (isInitialized) {
             LOG.info("WecoderPluginService already initialized")
+            return
+        }
+        if (isInitializationInProgress) {
+            LOG.info("WecoderPluginService initialization already in progress")
+            return
+        }
+        if (!forceRetry && lastInitializationFailure != null) {
+            LOG.warn("Previous initialization failed (${lastInitializationFailure?.reason}), skip automatic retry")
             return
         }
         
@@ -362,6 +376,10 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
         SystemObjectProvider.register("pluginService", this)
         
         // Start initialization in background thread
+        if (forceRetry) {
+            lastInitializationFailure = null
+        }
+        isInitializationInProgress = true
         coroutineScope.launch {
             try {
                 initPlatformFiles()
@@ -382,6 +400,7 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
                     // Initialization successful
                     isInitialized = true
                     initializationComplete.complete(true)
+                    lastInitializationFailure = null
                     LOG.info("Debug mode connection successful, WecoderPluginService initialized")
                 } else {
                     // Normal mode: start Socket server and extension process
@@ -399,20 +418,37 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
                     if (!processManager.start(portOrPath)) {
                         LOG.error("Failed to start extension process")
                         server.stop()
+                        lastInitializationFailure = processManager.getLastFailure()
                         initializationComplete.complete(false)
                         return@launch
                     }
                     // Initialization successful
                     isInitialized = true
                     initializationComplete.complete(true)
+                    lastInitializationFailure = null
                     LOG.info("WecoderPluginService initialization completed")
                 }
             } catch (e: Exception) {
                 LOG.error("Error during WecoderPluginService initialization", e)
                 cleanup()
+                lastInitializationFailure = processManager.getLastFailure()
+                    ?: ExtensionProcessManager.StartFailure(
+                        ExtensionProcessManager.StartFailureReason.PROCESS_START_EXCEPTION,
+                        e.message ?: "Unknown initialization error"
+                    )
                 initializationComplete.complete(false)
+            } finally {
+                isInitializationInProgress = false
             }
         }
+    }
+    
+    fun getLastInitializationFailure(): ExtensionProcessManager.StartFailure? {
+        return lastInitializationFailure
+    }
+
+    fun clearLastInitializationFailure() {
+        lastInitializationFailure = null
     }
 
     private fun initPlatformFiles() {
@@ -491,6 +527,8 @@ class WecoderPluginService(private var currentProject: Project) : Disposable {
 //        WorkspaceFileChangeManager.disposeInstance()
         
         isInitialized = false
+        lastInitializationFailure = null
+        isInitializationInProgress = false
     }
     
     /**

@@ -29,7 +29,7 @@ class CostrictProjectViewButtonProvider : ExtensionButtonProvider {
     
     override fun getExtensionId(): String = "costrict"
     
-    override fun getDisplayName(): String = "Costrict"
+    override fun getDisplayName(): String = "CoStrict"
     
     override fun getDescription(): String = "AI-powered code assistant for project view operations"
     
