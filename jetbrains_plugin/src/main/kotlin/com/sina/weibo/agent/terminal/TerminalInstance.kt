@@ -52,7 +52,7 @@ class TerminalInstance(
 ) : Disposable {
 
     companion object {
-        private const val DEFAULT_TERMINAL_NAME = "Costrict"
+        private const val DEFAULT_TERMINAL_NAME = "CoStrict"
         private const val TERMINAL_TOOL_WINDOW_ID = "Terminal"
     }
 
