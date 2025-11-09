@@ -99,6 +99,7 @@ SPDX-License-Identifier: Apache-2.0
         <editorFactoryListener implementation="com.sina.weibo.agent.editor.EditorListener"/>
         <runLineMarkerContributor language="Markdown"
                                   implementationClass="com.sina.weibo.agent.extensions.plugin.costrict.WorkflowLineMarkerProvider"/>
+        <postStartupActivity implementation="com.sina.weibo.agent.extensions.plugin.costrict.TaskLineBackgroundProviderInitializer"/>
                                   
         <toolWindow factoryClass="com.sina.weibo.agent.ui.RunVSAgentToolWindowFactory"
                     id="CoStrict"
