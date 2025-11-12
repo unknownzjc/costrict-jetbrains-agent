@@ -174,7 +174,7 @@ get_latest_file() {
     local dir="$1"
     local pattern="$2"
     
-    find_files "$dir" "$pattern" | sort -r | head -n 1
+    find_files "$dir" "$pattern" | sort -rV | head -n 1
 }
 
 # Platform detection

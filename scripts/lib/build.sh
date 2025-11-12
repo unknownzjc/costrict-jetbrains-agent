@@ -24,6 +24,7 @@ SKIP_VSCODE_BUILD=false
 SKIP_BASE_BUILD=false
 SKIP_IDEA_BUILD=false
 SKIP_NODEJS_PREPARE=false
+COSTRICT_VERSION=""
 
 # Node.js configuration
 readonly NODEJS_VERSION="20.6.0"
@@ -146,6 +147,42 @@ revert_vscode_changes() {
     log_success "VSCode changes reverted"
 }
 
+# Switch CoStrict to specified version
+switch_costrict_version() {
+    if [[ -z "${COSTRICT_VERSION:-}" ]]; then
+        log_debug "No CoStrict version specified, using current version"
+        return 0
+    fi
+    
+    log_step "Switching CoStrict to version: $COSTRICT_VERSION..."
+    
+    # Check if submodule directory exists
+    if [[ ! -d "$PLUGIN_BUILD_DIR" ]]; then
+        die "CoStrict submodule directory not found: $PLUGIN_BUILD_DIR"
+    fi
+    
+    cd "$PLUGIN_BUILD_DIR"
+    
+    # Fetch latest from remote to ensure we have the specified version
+    execute_cmd "git fetch origin" "fetch latest from remote"
+    
+    # Check if the specified version exists
+    if ! git rev-parse --verify "$COSTRICT_VERSION" >/dev/null 2>&1; then
+        die "CoStrict version '$COSTRICT_VERSION' not found. Please check the version/tag/branch name."
+    fi
+    
+    # Switch to the specified version
+    execute_cmd "git checkout $COSTRICT_VERSION" "switch to CoStrict version $COSTRICT_VERSION"
+    
+    # Show current commit info
+    local current_commit=$(git rev-parse HEAD)
+    local commit_message=$(git log -1 --pretty=format:"%s" "$current_commit")
+    log_info "Switched to CoStrict version: $COSTRICT_VERSION (commit: ${current_commit:0:8})"
+    log_info "Commit message: $commit_message"
+    
+    log_success "CoStrict version switched successfully"
+}
+
 # Build VSCode extension
 build_vscode_extension() {
     if [[ "$SKIP_VSCODE_BUILD" == "true" ]]; then
@@ -154,6 +191,9 @@ build_vscode_extension() {
     fi
     
     log_step "Building VSCode extension..."
+    
+    # Switch to specified CoStrict version if provided
+    switch_costrict_version
     
     cd "$PLUGIN_BUILD_DIR"
     
