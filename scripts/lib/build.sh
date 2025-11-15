@@ -173,6 +173,8 @@ switch_costrict_version() {
     
     # Switch to the specified version
     execute_cmd "git checkout $COSTRICT_VERSION" "switch to CoStrict version $COSTRICT_VERSION"
+
+    execute_cmd "git pull" "sync remote code"
     
     # Show current commit info
     local current_commit=$(git rev-parse HEAD)
