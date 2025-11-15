@@ -25,6 +25,7 @@ CLEAN_BEFORE_BUILD=false
 SKIP_TESTS=false
 OUTPUT_DIR=""
 BUILD_PLATFORM="all"
+COSTRICT_VERSION=""
 
 # Show help for this script
 show_help() {
@@ -52,6 +53,7 @@ OPTIONS:
     -o, --output DIR      Output directory for build artifacts
     -p, --platform PLATFORM   Build platform: all (default), windows, linux
     -t, --skip-tests      Skip running tests
+    --costrict-version VERSION   CoStrict version to build (branch, tag, or commit)
     --vsix FILE           Use existing VSIX file (skip VSCode build)
     --skip-vscode         Skip VSCode extension build
     --skip-base           Skip base extension build
@@ -73,10 +75,13 @@ EXAMPLES:
     $SCRIPT_NAME --clean vscode            # Clean build VSCode only
     $SCRIPT_NAME --vsix path/to/file.vsix  # Use existing VSIX
     $SCRIPT_NAME --output ./dist           # Custom output directory
+    $SCRIPT_NAME --costrict-version v1.2.3 # Build with specific CoStrict version
+    $SCRIPT_NAME --costrict-version develop    # Build with develop branch
 
 ENVIRONMENT:
     BUILD_MODE           Override build mode (release/debug)
     VSIX_FILE            Path to existing VSIX file
+    COSTRICT_VERSION    Override CoStrict version (branch, tag, or commit)
     SKIP_VSCODE_BUILD    Skip VSCode build if set to 'true'
     SKIP_BASE_BUILD      Skip base build if set to 'true'
     SKIP_IDEA_BUILD      Skip IDEA build if set to 'true'
@@ -102,6 +107,14 @@ parse_build_args() {
                     exit 3
                 fi
                 BUILD_MODE="$2"
+                shift 2
+                ;;
+            --costrict-version)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "CoStrict version requires a value"
+                    exit 3
+                fi
+                COSTRICT_VERSION="$2"
                 shift 2
                 ;;
             -c|--clean)
@@ -238,6 +251,7 @@ parse_build_args() {
     [[ "${SKIP_BASE_BUILD:-false}" == "true" ]] && SKIP_BASE_BUILD=true
     [[ "${SKIP_IDEA_BUILD:-false}" == "true" ]] && SKIP_IDEA_BUILD=true
     [[ -n "${VSIX_FILE:-}" ]] && VSIX_FILE="$VSIX_FILE"
+    [[ -n "${COSTRICT_VERSION:-}" ]] && COSTRICT_VERSION="$COSTRICT_VERSION"
     
     # Ensure the function returns 0 on success, preventing `set -e` from exiting the script.
     true
@@ -565,6 +579,7 @@ main() {
     log_info "  Clean: $CLEAN_BEFORE_BUILD"
     log_info "  Skip tests: $SKIP_TESTS"
     [[ -n "$OUTPUT_DIR" ]] && log_info "  Output: $OUTPUT_DIR"
+    [[ -n "$COSTRICT_VERSION" ]] && log_info "  CoStrict version: $COSTRICT_VERSION"
     
     # Initialize build environment
     init_build_env
