@@ -8,14 +8,9 @@ import com.intellij.icons.AllIcons
 import com.intellij.psi.PsiElement
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.vfs.VirtualFile
-import com.sina.weibo.agent.actions.WorkflowRunCommandAction
-import com.sina.weibo.agent.actions.WorkflowDebugRunCommandAction
-import com.sina.weibo.agent.actions.WorkflowEditConfigAction
+import com.sina.weibo.agent.actions.WorkflowMenuAction
 import com.sina.weibo.agent.actions.SyncToDesignAction
 import com.sina.weibo.agent.actions.SyncToTasksAction
-import com.sina.weibo.agent.actions.RunTaskAction
-import com.sina.weibo.agent.actions.RunAllTasksAction
-import com.sina.weibo.agent.actions.GenerateTestsAction
 
 /**
  * Costrict extension provider implementation
@@ -83,7 +78,7 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
             }
             
             "tasks.md" -> {
-                // tasks.md 任务列表文档，为每个任务项根据状态添加不同按钮组合
+                // tasks.md 任务列表文档，为每个任务项根据状态添加统一操作按钮
                 // 检测任务项：以 "- [ ]"、"- [x]" 或 "- [-]" 开头的行
                 if (text.trimStart().startsWith("- [") &&
                     (text.trimStart().startsWith("- [ ]") || // 待执行的任务
@@ -92,42 +87,27 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
                     
                     val trimmedText = text.trimStart()
                     
-                    // 根据任务状态选择不同的图标和提示文本
-                    when {
-                        trimmedText.startsWith("- [ ]") -> {
-                            // 待执行任务：运行、运行所有任务、生成测试用例
-                            val runAction = RunTaskAction("运行")
-                            val runAllAction = RunAllTasksAction("运行所有任务")
-                            val generateTestsAction = GenerateTestsAction("生成测试用例")
-                            
-                            return Info(
-                                AllIcons.RunConfigurations.TestState.Run,
-                                { "待执行任务" },
-                                runAction, runAllAction, generateTestsAction
-                            )
+                    // 根据任务状态创建统一的菜单操作
+                    val taskStatus = when {
+                        trimmedText.startsWith("- [ ]") -> WorkflowMenuAction.TaskStatus.PENDING
+                        trimmedText.startsWith("- [-]") -> WorkflowMenuAction.TaskStatus.IN_PROGRESS
+                        trimmedText.startsWith("- [x]") -> WorkflowMenuAction.TaskStatus.COMPLETED
+                        else -> null
+                    }
+                    
+                    taskStatus?.let { status ->
+                        val menuAction = WorkflowMenuAction(status, trimmedText)
+                        val statusText = when (status) {
+                            WorkflowMenuAction.TaskStatus.PENDING -> "待执行任务"
+                            WorkflowMenuAction.TaskStatus.IN_PROGRESS -> "进行中任务"
+                            WorkflowMenuAction.TaskStatus.COMPLETED -> "已完成任务"
                         }
-                        trimmedText.startsWith("- [-]") -> {
-                            // 进行中任务：使用动画图标表示正在运行，点击时显示重试按钮
-                            val retryAction = WorkflowDebugRunCommandAction("重试")
-                            
-                            return Info(
-                                AllIcons.RunConfigurations.TestState.Run,
-                                { "进行中任务" },
-                                retryAction
-                            )
-                        }
-                        trimmedText.startsWith("- [x]") -> {
-                            // 已完成任务：重试、运行所有任务、生成测试用例
-                            val retryAction = WorkflowDebugRunCommandAction("重试")
-                            val runAllAction = RunAllTasksAction("运行所有任务")
-                            val generateTestsAction = GenerateTestsAction("生成测试用例")
-                            
-                            return Info(
-                                AllIcons.RunConfigurations.TestState.Run,
-                                { "已完成任务" },
-                                retryAction, runAllAction, generateTestsAction
-                            )
-                        }
+                        
+                        return Info(
+                            AllIcons.RunConfigurations.TestState.Run,
+                            { statusText },
+                            menuAction
+                        )
                     }
                 }
             }
@@ -142,6 +122,14 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
     private fun isFirstElementInLine(element: PsiElement): Boolean {
         val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(element.containingFile.virtualFile) ?: return false
         val lineStartOffset = document.getLineStartOffset(document.getLineNumber(element.textOffset))
-        return element.textOffset == lineStartOffset || element.text.trim().startsWith("#")
+        
+        // 检查从行开始到元素位置之间是否只有空白字符
+        val lineText = document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, element.textOffset))
+        if (lineText.isBlank()) {
+            // 如果元素是行开始的第一个非空白字符，或者是标题元素（以#开头）
+            return element.text.trim().startsWith("#") || element.textOffset == lineStartOffset
+        }
+        
+        return false
     }
 }

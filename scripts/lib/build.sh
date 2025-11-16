@@ -164,7 +164,7 @@ switch_costrict_version() {
     cd "$PLUGIN_BUILD_DIR"
     
     # Fetch latest from remote to ensure we have the specified version
-    execute_cmd "git fetch origin" "fetch latest from remote"
+    execute_cmd "git fetch --all" "fetch latest from remote"
     
     # Check if the specified version exists
     if ! git rev-parse --verify "$COSTRICT_VERSION" >/dev/null 2>&1; then
