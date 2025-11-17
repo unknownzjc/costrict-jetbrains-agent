@@ -14,8 +14,14 @@ import com.intellij.openapi.ui.Messages
  */
 class GenerateTestsAction(private val command: String = "生成测试用例") : AnAction(command) {
     override fun actionPerformed(e: AnActionEvent) {
-        val project: Project = e.project ?: return
+        println("GenerateTestsAction: 开始执行 actionPerformed")
+        val project: Project = e.project ?: run {
+            println("GenerateTestsAction: 项目为空，返回")
+            return
+        }
+        println("GenerateTestsAction: 显示信息对话框")
         Messages.showInfoMessage(project, "正在生成测试用例", "生成中")
         // 这里添加实际生成测试用例的逻辑
+        println("GenerateTestsAction: 测试用例生成完成")
     }
 }

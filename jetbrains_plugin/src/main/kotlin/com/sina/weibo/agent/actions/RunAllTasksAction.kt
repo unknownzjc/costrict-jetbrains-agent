@@ -14,8 +14,14 @@ import com.intellij.openapi.ui.Messages
  */
 class RunAllTasksAction(private val command: String = "运行所有任务") : AnAction(command) {
     override fun actionPerformed(e: AnActionEvent) {
-        val project: Project = e.project ?: return
+        println("RunAllTasksAction: 开始执行 actionPerformed")
+        val project: Project = e.project ?: run {
+            println("RunAllTasksAction: 项目为空，返回")
+            return
+        }
+        println("RunAllTasksAction: 显示信息对话框")
         Messages.showInfoMessage(project, "正在执行所有任务", "运行中")
         // 这里添加实际运行所有任务的逻辑
+        println("RunAllTasksAction: 所有任务执行完成")
     }
 }
