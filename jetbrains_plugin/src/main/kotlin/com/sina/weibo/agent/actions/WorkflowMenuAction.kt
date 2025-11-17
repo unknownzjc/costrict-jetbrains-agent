@@ -17,7 +17,8 @@ import javax.swing.JPopupMenu
  */
 class WorkflowMenuAction(
     private val taskStatus: TaskStatus,
-    private val taskText: String = ""
+    private val taskText: String = "",
+    private val isFirstTask: Boolean = false
 ) : AnAction() {
     
     enum class TaskStatus {
@@ -27,14 +28,14 @@ class WorkflowMenuAction(
     }
     
     init {
-        // 根据任务状态设置不同的显示文本和描述
-        templatePresentation.text = when (taskStatus) {
-            TaskStatus.PENDING -> "任务操作"
-            TaskStatus.IN_PROGRESS -> "任务操作"
-            TaskStatus.COMPLETED -> "任务操作"
-        }
+        // // 根据任务状态设置不同的显示文本和描述
+        // templatePresentation.text = when (taskStatus) {
+        //     TaskStatus.PENDING -> "任务操作1"
+        //     TaskStatus.IN_PROGRESS -> "任务操作2"
+        //     TaskStatus.COMPLETED -> "任务操作3"
+        // }
         
-        templatePresentation.description = "点击查看可用操作"
+        // templatePresentation.description = "点击查看可用操作"
     }
     
     override fun actionPerformed(e: AnActionEvent) {
@@ -53,31 +54,53 @@ class WorkflowMenuAction(
                 runAction.addActionListener { RunTaskAction("运行").actionPerformed(e) }
                 popup.add(runAction)
                 
-                val runAllAction = JMenuItem("运行所有任务")
-                runAllAction.addActionListener { RunAllTasksAction("运行所有任务").actionPerformed(e) }
-                popup.add(runAllAction)
-                
-                val generateTestsAction = JMenuItem("生成测试用例")
-                generateTestsAction.addActionListener { GenerateTestsAction("生成测试用例").actionPerformed(e) }
-                popup.add(generateTestsAction)
+                // 只有第一个任务才显示"运行所有任务"和"生成测试用例"
+                if (isFirstTask) {
+                    val runAllAction = JMenuItem("运行所有任务")
+                    runAllAction.addActionListener { RunAllTasksAction("运行所有任务").actionPerformed(e) }
+                    popup.add(runAllAction)
+                    
+                    val generateTestsAction = JMenuItem("生成测试用例")
+                    generateTestsAction.addActionListener { GenerateTestsAction("生成测试用例").actionPerformed(e) }
+                    popup.add(generateTestsAction)
+                }
             }
             TaskStatus.IN_PROGRESS -> {
-                val retryAction = JMenuItem("重试")
-                retryAction.addActionListener { WorkflowDebugRunCommandAction("重试").actionPerformed(e) }
-                popup.add(retryAction)
+                // 运行中状态显示为状态文本，不是可点击的操作
+                val inProgressStatus = JMenuItem("运行中")
+                inProgressStatus.isEnabled = false  // 禁用点击，仅作为状态显示
+                popup.add(inProgressStatus)
+                
+                // 只有第一个任务才显示"运行所有任务"和"生成测试用例"
+                if (isFirstTask) {
+                    val runAllAction = JMenuItem("运行所有任务")
+                    runAllAction.addActionListener { RunAllTasksAction("运行所有任务").actionPerformed(e) }
+                    popup.add(runAllAction)
+                    
+                    val generateTestsAction = JMenuItem("生成测试用例")
+                    generateTestsAction.addActionListener { GenerateTestsAction("生成测试用例").actionPerformed(e) }
+                    popup.add(generateTestsAction)
+                }else {
+                     val retryAction = JMenuItem("重试")
+                    retryAction.addActionListener { WorkflowDebugRunCommandAction("重试").actionPerformed(e) }
+                    popup.add(retryAction)
+                }
             }
             TaskStatus.COMPLETED -> {
                 val retryAction = JMenuItem("重试")
                 retryAction.addActionListener { WorkflowDebugRunCommandAction("重试").actionPerformed(e) }
                 popup.add(retryAction)
                 
-                val runAllAction = JMenuItem("运行所有任务")
-                runAllAction.addActionListener { RunAllTasksAction("运行所有任务").actionPerformed(e) }
-                popup.add(runAllAction)
-                
-                val generateTestsAction = JMenuItem("生成测试用例")
-                generateTestsAction.addActionListener { GenerateTestsAction("生成测试用例").actionPerformed(e) }
-                popup.add(generateTestsAction)
+                // 只有第一个任务才显示"运行所有任务"和"生成测试用例"
+                if (isFirstTask) {
+                    val runAllAction = JMenuItem("运行所有任务")
+                    runAllAction.addActionListener { RunAllTasksAction("运行所有任务").actionPerformed(e) }
+                    popup.add(runAllAction)
+                    
+                    val generateTestsAction = JMenuItem("生成测试用例")
+                    generateTestsAction.addActionListener { GenerateTestsAction("生成测试用例").actionPerformed(e) }
+                    popup.add(generateTestsAction)
+                }
             }
         }
         
@@ -142,7 +165,7 @@ class WorkflowMenuAction(
         // 根据任务状态设置不同的图标
         presentation.icon = when (taskStatus) {
             TaskStatus.PENDING -> com.intellij.icons.AllIcons.RunConfigurations.TestState.Run
-            TaskStatus.IN_PROGRESS -> com.intellij.icons.AllIcons.RunConfigurations.TestState.Run
+            TaskStatus.IN_PROGRESS -> com.intellij.icons.AllIcons.Process.Step_1  // 使用加载/运行中的图标
             TaskStatus.COMPLETED -> com.intellij.icons.AllIcons.RunConfigurations.TestState.Run
         }
         

@@ -57,6 +57,8 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
                         syncToDesign
                     )
                 }
+
+                return null // 如果不是标题行，则不添加标记
             }
             
             "design.md" -> {
@@ -75,17 +77,27 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
                         syncToTasks
                     )
                 }
+
+                return null // 如果不是任务项，则不添加标记
             }
             
             "tasks.md" -> {
+                // 确保文本不为空且包含内容
+                if (text.isNullOrBlank()) {
+                    return null
+                }
+                
+                val trimmedText = text.trimStart()
+                
                 // tasks.md 任务列表文档，为每个任务项根据状态添加统一操作按钮
                 // 检测任务项：以 "- [ ]"、"- [x]" 或 "- [-]" 开头的行
-                if (text.trimStart().startsWith("- [") &&
-                    (text.trimStart().startsWith("- [ ]") || // 待执行的任务
-                     text.trimStart().startsWith("- [x]") || // 已完成的任务
-                     text.trimStart().startsWith("- [-]"))) { // 进行中的任务
+                if (trimmedText.startsWith("- [") &&
+                    (trimmedText.startsWith("- [ ]") || // 待执行的任务
+                     trimmedText.startsWith("- [x]") || // 已完成的任务
+                     trimmedText.startsWith("- [-]"))) { // 进行中的任务
                     
-                    val trimmedText = text.trimStart()
+                    // 检查是否是第一个任务块
+                    val isFirstTask = checkIfFirstTask(element)
                     
                     // 根据任务状态创建统一的菜单操作
                     val taskStatus = when {
@@ -96,7 +108,7 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
                     }
                     
                     taskStatus?.let { status ->
-                        val menuAction = WorkflowMenuAction(status, trimmedText)
+                        val menuAction = WorkflowMenuAction(status, trimmedText, isFirstTask)
                         val statusText = when (status) {
                             WorkflowMenuAction.TaskStatus.PENDING -> "待执行任务"
                             WorkflowMenuAction.TaskStatus.IN_PROGRESS -> "进行中任务"
@@ -110,6 +122,8 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
                         )
                     }
                 }
+
+                return null // 如果不是任务项，则不添加标记
             }
         }
 
@@ -120,14 +134,72 @@ class WorkflowLineMarkerProvider : RunLineMarkerContributor() {
      * 检查元素是否是行的第一个元素
      */
     private fun isFirstElementInLine(element: PsiElement): Boolean {
+        // 首先检查元素文本是否为空或仅包含空白字符
+        if (element.text.isNullOrBlank()) {
+            return false
+        }
+        
         val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(element.containingFile.virtualFile) ?: return false
         val lineStartOffset = document.getLineStartOffset(document.getLineNumber(element.textOffset))
+        val lineEndOffset = document.getLineEndOffset(document.getLineNumber(element.textOffset))
         
-        // 检查从行开始到元素位置之间是否只有空白字符
-        val lineText = document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, element.textOffset))
-        if (lineText.isBlank()) {
-            // 如果元素是行开始的第一个非空白字符，或者是标题元素（以#开头）
-            return element.text.trim().startsWith("#") || element.textOffset == lineStartOffset
+        // 获取完整的行文本
+        val fullLineText = document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
+        val trimmedLineText = fullLineText.trimStart()
+        
+        // 检查元素是否匹配行首的任务模式
+        val elementText = element.text.trim()
+        val isTaskLine = trimmedLineText.startsWith("- [") &&
+            (trimmedLineText.startsWith("- [ ]") ||
+             trimmedLineText.startsWith("- [x]") ||
+             trimmedLineText.startsWith("- [-]"))
+        
+        // 如果是任务行，检查元素是否包含任务的起始部分
+        if (isTaskLine) {
+            // 检查元素文本是否包含任务标记的开头部分
+            if (elementText.contains("- [") || elementText.contains("-") || elementText.contains("[")) {
+                // 进一步检查元素是否位于行首的非空白位置
+                val elementOffsetInLine = element.textOffset - lineStartOffset
+                val leadingWhitespace = fullLineText.take(elementOffsetInLine)
+                
+                // 只有当元素前面只有空白字符时才返回true
+                return leadingWhitespace.isBlank()
+            }
+        }
+        
+        // 对于标题行的检查
+        if (elementText.startsWith("#") || elementText.trimStart().startsWith("#")) {
+            val elementOffsetInLine = element.textOffset - lineStartOffset
+            val leadingWhitespace = fullLineText.take(elementOffsetInLine)
+            return leadingWhitespace.isBlank()
+        }
+        
+        return false
+    }
+    
+    /**
+     * 检查当前任务是否是文档中的第一个任务块
+     */
+    private fun checkIfFirstTask(element: PsiElement): Boolean {
+        val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(element.containingFile.virtualFile) ?: return false
+        val currentLineNumber = document.getLineNumber(element.textOffset)
+        
+        // 从文档开始遍历，查找第一个任务块
+        for (lineNum in 0 until document.lineCount) {
+            val lineText = document.getText(com.intellij.openapi.util.TextRange(
+                document.getLineStartOffset(lineNum),
+                document.getLineEndOffset(lineNum)
+            ))
+            
+            // 检查是否是任务行
+            if (lineText.trimStart().startsWith("- [") &&
+                (lineText.trimStart().startsWith("- [ ]") ||
+                 lineText.trimStart().startsWith("- [x]") ||
+                 lineText.trimStart().startsWith("- [-]"))) {
+                
+                // 如果当前行就是我们检查的行，那么它就是第一个任务
+                return lineNum == currentLineNumber
+            }
         }
         
         return false
