@@ -210,7 +210,7 @@ build_vscode_extension() {
     
     # Apply Windows compatibility fix if needed
     apply_windows_compatibility_fix
-    
+    execute_cmd "$pkg_manager run clean" "VSIX clean"
     # Build based on mode
     if [[ "$BUILD_MODE" == "$BUILD_MODE_DEBUG" ]]; then
         log_info "Building in debug mode..."
