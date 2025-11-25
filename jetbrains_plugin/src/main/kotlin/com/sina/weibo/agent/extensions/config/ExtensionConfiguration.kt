@@ -200,7 +200,7 @@ data class ExtensionConfig(
                     displayName = "Costrict",
                     description = "AI-powered code assistant with advanced capabilities",
                     publisher = "zgsm-ai",
-                    version = "1.6.5",
+                    version = getCostrictVersion(),
                     mainFile = "./dist/extension.js",
                     activationEvents = listOf("onStartupFinished"),
                     engines = mapOf("vscode" to "^1.0.0"),
@@ -217,6 +217,41 @@ data class ExtensionConfig(
             // This would load from a properties file specific to the extension type
             // For now, return default configuration
             return getDefault(extensionType)
+        }
+        
+        /**
+         * Get Costrict version from gradle.properties file
+         * This allows dynamic version setting during build time
+         */
+        private fun getCostrictVersion(): String {
+            return try {
+                // 尝试多个可能的路径来查找 gradle.properties 文件
+                val possiblePaths = listOf(
+                    "gradle.properties",                    // 相对于当前工作目录
+                    "./gradle.properties",                  // 相对于当前目录
+                    "../gradle.properties",                 // 上一级目录
+                    "../../jetbrains_plugin/gradle.properties", // 从项目根目录
+                    "jetbrains_plugin/gradle.properties"    // 从项目根目录
+                )
+                
+                for (path in possiblePaths) {
+                    val gradlePropertiesFile = File(path)
+                    if (gradlePropertiesFile.exists()) {
+                        val properties = Properties()
+                        properties.load(gradlePropertiesFile.inputStream())
+                        val version = properties.getProperty("pluginVersion")
+                        if (!version.isNullOrEmpty()) {
+                            return version
+                        }
+                    }
+                }
+                
+                // 如果所有路径都找不到文件或版本号，使用默认版本
+                "2.0.7"
+            } catch (e: Exception) {
+                // 发生任何错误时，使用默认版本
+                "2.0.7"
+            }
         }
     }
 } 
