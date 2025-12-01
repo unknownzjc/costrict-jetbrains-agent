@@ -8,7 +8,7 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$LIB_DIR/common.sh"
 
 # Build configuration
-readonly DEFAULT_BUILD_MODE="release"
+DEFAULT_BUILD_MODE="release"
 readonly VSCODE_BRANCH="develop"
 readonly IDEA_DIR="jetbrains_plugin"
 readonly TEMP_PREFIX="build_temp_"
@@ -161,25 +161,58 @@ switch_costrict_version() {
         die "CoStrict submodule directory not found: $PLUGIN_BUILD_DIR"
     fi
     
+    # First, initialize and update submodule from main repository
+    log_debug "Initializing submodule from main repository..."
+    cd "$PROJECT_ROOT"
+    execute_cmd "git submodule sync --recursive" "sync submodule URLs"
+    execute_cmd "git submodule update --init --recursive" "initialize and update submodules"
+    
     cd "$PLUGIN_BUILD_DIR"
     
-    # Fetch latest from remote to ensure we have the specified version
-    execute_cmd "git fetch --all" "fetch latest from remote"
+    # Check if we are in a detached HEAD state and fix if needed
+    if git symbolic-ref -q HEAD >/dev/null 2>&1; then
+        log_debug "Currently on a branch, good state"
+    else
+        log_debug "Currently in detached HEAD state, checking out main first"
+        execute_cmd "git checkout main" "checkout main branch"
+    fi
     
-    # Check if the specified version exists
-    if ! git rev-parse --verify "$COSTRICT_VERSION" >/dev/null 2>&1; then
+    # Fetch latest from remote to ensure we have the specified version
+    execute_cmd "git fetch origin --tags --prune" "fetch latest from remote including tags"
+    
+    # Check if the specified version exists (branch, tag, or commit)
+    local target_commit=""
+    if git rev-parse --verify "origin/$COSTRICT_VERSION" >/dev/null 2>&1; then
+        target_commit="origin/$COSTRICT_VERSION"
+        log_debug "Found remote branch: $COSTRICT_VERSION"
+    elif git rev-parse --verify "$COSTRICT_VERSION" >/dev/null 2>&1; then
+        target_commit="$COSTRICT_VERSION"
+        log_debug "Found local reference: $COSTRICT_VERSION"
+    else
         die "CoStrict version '$COSTRICT_VERSION' not found. Please check the version/tag/branch name."
     fi
     
     # Switch to the specified version
-    execute_cmd "git checkout $COSTRICT_VERSION" "switch to CoStrict version $COSTRICT_VERSION"
-
-    execute_cmd "git pull" "sync remote code"
+    execute_cmd "git checkout $target_commit" "switch to CoStrict version $COSTRICT_VERSION"
+    
+    # Ensure the working directory is clean
+    if [[ -n $(git status --porcelain) ]]; then
+        log_warn "Working directory is not clean, cleaning..."
+        execute_cmd "git reset --hard HEAD" "reset to clean state"
+        execute_cmd "git clean -fd" "remove untracked files"
+    fi
     
     # Show current commit info
     local current_commit=$(git rev-parse HEAD)
     local commit_message=$(git log -1 --pretty=format:"%s" "$current_commit")
-    log_info "Switched to CoStrict version: $COSTRICT_VERSION (commit: ${current_commit:0:8})"
+    local current_tag=""
+    
+    # Try to find if current commit has a tag
+    if current_tag=$(git describe --tags --exact-match "$current_commit" 2>/dev/null); then
+        log_info "Switched to CoStrict version: $COSTRICT_VERSION (tag: $current_tag, commit: ${current_commit:0:8})"
+    else
+        log_info "Switched to CoStrict version: $COSTRICT_VERSION (commit: ${current_commit:0:8})"
+    fi
     log_info "Commit message: $commit_message"
     
     log_success "CoStrict version switched successfully"

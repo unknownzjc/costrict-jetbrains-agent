@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.sina.weibo.agent.commands.CommandRegistry
 import com.sina.weibo.agent.commands.ICommand
+import com.sina.weibo.agent.diff.DiffViewRegistrar
 import com.sina.weibo.agent.editor.registerOpenEditorAPICommands
 import com.sina.weibo.agent.terminal.registerTerminalAPICommands
 import com.sina.weibo.agent.util.doInvokeMethod
@@ -68,6 +69,7 @@ class MainThreadCommands(val project: Project) : MainThreadCommandsShape {
     init {
         registerOpenEditorAPICommands(project,registry);
         registerTerminalAPICommands(project,registry);
+        DiffViewRegistrar.registerDiffCommands(project, registry);
         //TODO other commands
     }
     /**
@@ -106,10 +108,21 @@ class MainThreadCommands(val project: Project) : MainThreadCommandsShape {
      */
     override suspend fun executeCommand(id: String, args: List<Any?>): Any? {
         logger.info("Executing command: $id ")
-        registry.getCommand(id)?.let { cmd->
+        
+        // 添加命令映射逻辑，处理 VSCode 与 JetBrains 命令命名差异
+        val commandId = when (id) {
+            "_workbench.changes" -> "vscode.changes"  // 映射 _workbench.changes 到 vscode.changes
+            else -> id
+        }
+        
+        registry.getCommand(commandId)?.let { cmd->
             runCmd(cmd,args)
         }?: run {
-            logger.warn("Command not found: $id")
+            if (id != commandId) {
+                logger.warn("Command not found: $id (mapped to: $commandId)")
+            } else {
+                logger.warn("Command not found: $id")
+            }
         }
         return Unit
     }

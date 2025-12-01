@@ -100,7 +100,7 @@ class OpenEditorAPICommands(val project: Project) {
                     return null
                 }
                 return contentFactory.create(project, file)
-            }else if(scheme == "cline-diff"){
+            }else if(scheme == "costrict-diff"){
                 val string = if(query != null){
                     val bytes = java.util.Base64.getDecoder().decode(query as String)
                     String(bytes)
