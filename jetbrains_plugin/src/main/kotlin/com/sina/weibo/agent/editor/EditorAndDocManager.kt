@@ -193,7 +193,7 @@ class EditorAndDocManager(val project: Project) : Disposable {
                     return null
                 }
                 return contentFactory.create(project, file)
-            }else if(scheme == "cline-diff"){
+            }else if(scheme == "costrict-diff"){
                 val string = if(query != null){
                     val bytes = java.util.Base64.getDecoder().decode(query)
                     String(bytes)
