@@ -229,8 +229,22 @@ fun Sync.prepareSandbox() {
     }
 }
 
+// 读取package.json中的版本号作为默认版本
+fun getPackageVersion(): String {
+    val packageJsonFile = File("../deps/costrict/src/package.json")
+    return if (packageJsonFile.exists()) {
+        val packageJson = groovy.json.JsonSlurper().parse(packageJsonFile) as Map<String, Any>
+        packageJson["version"] as String
+    } else {
+        "1.0.0" // 默认版本，如果文件不存在
+    }
+}
+
+// 获取pluginVersion，如果为空则使用package.json中的版本
+val pluginVersion = properties("pluginVersion").get().takeIf { it.isNotEmpty() } ?: getPackageVersion()
+
 group = properties("pluginGroup").get()
-version = properties("pluginVersion").get()
+version = pluginVersion
 
 repositories {
     mavenCentral()
@@ -296,7 +310,7 @@ tasks {
     }
 
     patchPluginXml {
-        version.set(properties("pluginVersion"))
+        version.set(pluginVersion)
         sinceBuild.set(properties("pluginSinceBuild"))
         untilBuild.set("")
     }
@@ -311,13 +325,12 @@ tasks {
     buildPlugin {
         val platform = providers.gradleProperty("targetPlatform").orElse("all").get()
         val platformIdentifier = providers.gradleProperty("platformIdentifier").getOrElse("")
-        val version = providers.gradleProperty("pluginVersion").get()
         val baseName = project.name
 
         val archiveName = if (platform != "all" && platformIdentifier.isNotEmpty()) {
-            "${baseName}-${version}-${platformIdentifier}"
+            "${baseName}-${pluginVersion}-${platformIdentifier}"
         } else {
-            "${baseName}-${version}"
+            "${baseName}-${pluginVersion}"
         }
 
         archiveFileName.set("${archiveName}.zip")
