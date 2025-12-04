@@ -124,7 +124,7 @@ class WeCoderTerminalCustomizer : LocalTerminalCustomizer() {
     envs["VSCODE_INJECTION"] = "1"
     
     return when (shellName) {
-      "bash", "sh" -> injectBashScript(command, envs, scriptPath)
+      "bash.exe", "bash", "sh" -> injectBashScript(command, envs, scriptPath)
       "zsh" -> injectZshScript(command, envs, scriptPath)
       "powershell", "pwsh", "powershell.exe" -> injectPowerShellScript(command, envs, scriptPath)
       else -> {

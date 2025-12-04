@@ -36,8 +36,8 @@ class CostrictCodeButtonProvider : ExtensionButtonProvider {
         // Note: project parameter kept for future extensibility
         return listOf(
             PlusButtonClickAction(),
-            PromptsButtonClickAction(),
-            MCPButtonClickAction(),
+            // PromptsButtonClickAction(),
+            // MCPButtonClickAction(),
             HistoryButtonClickAction(),
             MarketplaceButtonClickAction(),
             SettingsButtonClickAction(),
