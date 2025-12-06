@@ -10,6 +10,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.application.ApplicationInfo
+import org.jetbrains.plugins.terminal.TerminalProjectOptionsProvider
+import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import com.sina.weibo.agent.editor.EditorAndDocManager
 import com.sina.weibo.agent.ipc.NodeSocket
 import com.sina.weibo.agent.ipc.PersistentProtocol
@@ -336,7 +338,7 @@ class ExtensionHostManager : Disposable {
          // Get product code, which is the main identifier for distinguishing IDEs
         val productCode = applicationInfo.build.productCode
         val fullName = applicationInfo.fullApplicationName
-        
+
         val ideName = when (productCode) {
             "IC" -> "IntelliJ IDEA"
             "IU" -> "IntelliJ IDEA"  
@@ -355,7 +357,14 @@ class ExtensionHostManager : Disposable {
             else -> if (fullName?.contains("Android Studio") == true) "Android Studio" else "JetBrains"
         }
         LOG.info("Get IDE name, productCode: $productCode ideName: $ideName fullName: $fullName")
-        return ideName
+        
+        val shell = getShell()
+
+        if (shell.isNullOrBlank()) {
+            return ideName
+        }
+
+        return ideName + "[shell]${getShell()}"
     }
     
     /**
@@ -374,6 +383,18 @@ class ExtensionHostManager : Disposable {
         }
 
         return version
+    }
+
+   fun getShell(): String {
+        val projectShell = TerminalProjectOptionsProvider.getInstance(project).shellPath
+        LOG.info("Get IDE projectShell: $projectShell")
+        if (!projectShell.isNullOrBlank()) return projectShell
+        val applicationShell = TerminalOptionsProvider.instance.shellPath ?: ""
+
+        LOG.info("Get IDE applicationShell: $applicationShell")
+
+        // fallback
+        return applicationShell
     }
     
     /**
