@@ -44,10 +44,7 @@ class RunAllTasksAction : WorkflowActionBase(
         val selectedText = if (selectionModel.hasSelection()) {
             selectionModel.selectedText
         } else {
-            // 如果没有选中文本，使用当前行文本作为 selectedText
-            val lineStartOffset = document.getLineStartOffset(lineNumber)
-            val lineEndOffset = document.getLineEndOffset(lineNumber)
-            document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
+            allTasksContent
         }
         
         val startLine = if (selectionModel.hasSelection()) {
