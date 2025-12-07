@@ -36,8 +36,21 @@ class TasksFileHandler : FileTypeHandler {
         // 获取当前行号（0-based）
         val lineNumber = document.getLineNumber(element.textOffset)
         
-        // 创建带行号参数的 RunTaskAction
-        val action = com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
+        // 检查是否为第一个任务
+        val isFirstTask = isFirstTask(element, lineNumber)
+        
+        // 根据是否为第一个任务创建不同的Action
+        val action = if (isFirstTask) {
+            // 第一个任务使用下拉菜单，包含运行、运行所有、生成测试用例
+            com.sina.weibo.agent.actions.WorkflowMenuAction(
+                status,
+                trimmedText,
+                isFirstTask = true
+            )
+        } else {
+            // 其他任务使用单独的RunTaskAction
+            com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
+        }
         
         val statusText = getStatusText(status)
         return LineMarkerFactory.create(
@@ -62,12 +75,37 @@ class TasksFileHandler : FileTypeHandler {
     
     private fun getStatusText(status: WorkflowMenuAction.TaskStatus): String {
         return when (status) {
-            WorkflowMenuAction.TaskStatus.PENDING -> 
+            WorkflowMenuAction.TaskStatus.PENDING ->
                 CostrictFileConstants.STATUS_PENDING_TEXT
-            WorkflowMenuAction.TaskStatus.IN_PROGRESS -> 
+            WorkflowMenuAction.TaskStatus.IN_PROGRESS ->
                 CostrictFileConstants.STATUS_IN_PROGRESS_TEXT
-            WorkflowMenuAction.TaskStatus.COMPLETED -> 
+            WorkflowMenuAction.TaskStatus.COMPLETED ->
                 CostrictFileConstants.STATUS_COMPLETED_TEXT
         }
+    }
+    
+    /**
+     * 检查是否为第一个任务
+     */
+    private fun isFirstTask(element: PsiElement, currentLineNumber: Int): Boolean {
+        // 获取文件内容
+        val fileContent = element.containingFile?.text ?: return false
+        
+        // 按行分割
+        val lines = fileContent.split("\n")
+        
+        // 遍历所有行，查找第一个任务项
+        for ((index, line) in lines.withIndex()) {
+            val trimmedLine = line.trimStart()
+            // 检查是否为任务项（- [ ], - [-], - [x]）
+            if (trimmedLine.startsWith(CostrictFileConstants.TASK_PENDING) ||
+                trimmedLine.startsWith(CostrictFileConstants.TASK_IN_PROGRESS) ||
+                trimmedLine.startsWith(CostrictFileConstants.TASK_COMPLETED)) {
+                // 找到第一个任务，检查是否匹配当前行
+                return index == currentLineNumber
+            }
+        }
+        
+        return false
     }
 }

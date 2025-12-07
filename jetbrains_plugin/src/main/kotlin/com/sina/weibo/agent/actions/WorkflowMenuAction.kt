@@ -146,7 +146,7 @@ class WorkflowMenuAction(
                     retryAction.addActionListener {
                         try {
                             println("WorkflowMenuAction: 重试按钮被点击")
-                            val newAction = WorkflowDebugRunCommandAction("重试")
+                            val newAction = RetryTaskAction()
                             val newEvent = createActionEvent(e, project, editor)
                             newAction.actionPerformed(newEvent)
                         } catch (ex: Exception) {
@@ -162,7 +162,7 @@ class WorkflowMenuAction(
                 retryAction.addActionListener {
                     try {
                         println("WorkflowMenuAction: 重试按钮被点击")
-                        val newAction = WorkflowDebugRunCommandAction("重试")
+                        val newAction = RetryTaskAction()
                         val newEvent = createActionEvent(e, project, editor)
                         newAction.actionPerformed(newEvent)
                     } catch (ex: Exception) {

@@ -100,6 +100,23 @@ class WorkflowLineMarkerProvider : LineMarkerProvider {
                 // }
             }
         })
+        
+        // 监听文件内容变化事件
+        connection.subscribe(com.intellij.openapi.vfs.VirtualFileManager.VFS_CHANGES, object : com.intellij.openapi.vfs.newvfs.BulkFileListener {
+            override fun after(events: List<com.intellij.openapi.vfs.newvfs.events.VFileEvent>) {
+                for (event in events) {
+                    if (event is com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent) {
+                        val file = event.file
+                        // 当支持的 .cospec 文件内容发生变化时，清理缓存
+                        if (file.name in CostrictFileConstants.SUPPORTED_FILES && file.path.contains(CostrictFileConstants.COSPEC_DIR)) {
+                            // println("WorkflowLineMarkerProvider: 文件内容变化 - ${file.path}")
+                            clearFileCache(file.path)
+                            // printCacheState()
+                        }
+                    }
+                }
+            }
+        })
     }
     
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
