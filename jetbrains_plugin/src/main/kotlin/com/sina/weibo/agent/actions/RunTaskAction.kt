@@ -17,7 +17,7 @@ import com.sina.weibo.agent.extensions.plugin.costrict.CostrictFileConstants
  */
 class RunTaskAction : WorkflowActionBase(
     actionName = "运行任务",
-    rpcCommand = "zgsm.workflow.runTaskJetbrains",
+    rpcCommand = "zgsm.coworkflow.runTaskJetbrains",
     actionType = "run"
 ) {
     

@@ -17,7 +17,7 @@ import com.sina.weibo.agent.extensions.plugin.costrict.CostrictFileConstants
  */
 class SyncToTasksAction : WorkflowActionBase(
     actionName = "同步设计到任务",
-    rpcCommand = "zgsm.workflow.syncToTasksJetbrains",
+    rpcCommand = "zgsm.coworkflow.syncToTasksJetbrains",
     actionType = "sync_to_tasks"
 ) {
     

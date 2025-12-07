@@ -17,7 +17,7 @@ import com.sina.weibo.agent.extensions.plugin.costrict.CostrictFileConstants
  */
 class SyncToDesignAction : WorkflowActionBase(
     actionName = "同步需求到设计",
-    rpcCommand = "zgsm.workflow.syncToDesignJetbrains",
+    rpcCommand = "zgsm.coworkflow.syncToDesignJetbrains",
     actionType = "sync_to_design"
 ) {
     

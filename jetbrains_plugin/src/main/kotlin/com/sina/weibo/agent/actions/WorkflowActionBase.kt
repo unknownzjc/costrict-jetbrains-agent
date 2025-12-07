@@ -127,7 +127,7 @@ abstract class WorkflowActionBase(
         logger.info("$actionName: 执行 RPC 命令 - $rpcCommand")
         
         // 显示进度提示
-        Messages.showInfoMessage(project, "正在执行 $actionName...", "执行中")
+        // Messages.showInfoMessage(project, "正在执行 $actionName...", "执行中")
         
         // 调用 RPC
         val paramsMap = WorkflowActionParams.toMap(params)

@@ -17,7 +17,7 @@ import com.sina.weibo.agent.extensions.plugin.costrict.CostrictFileConstants
  */
 class GenerateTestsAction : WorkflowActionBase(
     actionName = "生成测试用例",
-    rpcCommand = "zgsm.workflow.runTestJetbrains",
+    rpcCommand = "zgsm.coworkflow.runTestJetbrains",
     actionType = "run_test"
 ) {
     
