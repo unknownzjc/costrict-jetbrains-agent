@@ -304,10 +304,20 @@ abstract class WorkflowActionBase(
      * 检查是否为第一个任务
      */
     protected fun isFirstTask(editor: Editor, psiFile: PsiFile, lineNumber: Int): Boolean {
-    // protected fun isFirstTask(psiFile: PsiFile): Boolean {
         if (!psiFile.name.endsWith(CostrictFileConstants.TASKS_FILE)) {
             return false
         }
-        return TaskBlockParser.isFirstTaskBlock(psiFile)
+        
+        val document = editor.document
+        val taskBlocks = TaskBlockParser.parseTaskBlocks(document)
+        
+        // 将 1-based lineNumber 转换为 0-based 进行匹配
+        val zeroBasedLineNumber = lineNumber - 1
+        
+        // 检查指定行号是否在第一个任务块内
+        val firstTaskBlock = taskBlocks.firstOrNull()
+        return firstTaskBlock?.let { block ->
+            zeroBasedLineNumber in block.startLine..block.endLine
+        } ?: false
     }
 }

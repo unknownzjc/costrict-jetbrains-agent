@@ -55,18 +55,25 @@ class RetryTaskAction : WorkflowActionBase {
             document.getLineNumber(caretModel.offset) + 1
         }
         
+        logger.info("RetryTaskAction: 使用行号 $lineNumber, 预定义行号: $predefinedLineNumber")
+        
         // 获取当前行的任务文本
         val taskText = getTaskText(editor, psiFile, lineNumber)
         if (taskText.isNullOrBlank()) {
-            logger.warn("RunTaskAction: 未找到任务文本")
+            logger.warn("RetryTaskAction: 未找到任务文本")
             throw IllegalStateException("未找到任务文本，请确保光标位于任务行上")
         }
+        
+        logger.info("RetryTaskAction: 获取到任务文本长度: ${taskText.length}, 前100字符: ${taskText.take(100)}")
         
         // 获取任务状态
         val lineStartOffset = document.getLineStartOffset(lineNumber)
         val lineEndOffset = document.getLineEndOffset(lineNumber)
         val lineText = document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
         val taskStatus = getTaskStatus(lineText)
+        
+        logger.info("RetryTaskAction: 行文本: $lineText")
+        logger.info("RetryTaskAction: 任务状态: $taskStatus")
         
         // 检查是否为第一个任务
         val isFirstTask = isFirstTask(editor, psiFile, lineNumber)

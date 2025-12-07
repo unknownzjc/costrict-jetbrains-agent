@@ -16,6 +16,18 @@ import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
 
 /**
+ * 扩展函数：找到列表中第一个满足条件的元素及其索引
+ */
+fun <T> List<T>.findWithIndex(predicate: (T) -> Boolean): Pair<Int, T>? {
+    for ((index, element) in this.withIndex()) {
+        if (predicate(element)) {
+            return Pair(index, element)
+        }
+    }
+    return null
+}
+
+/**
  * 工作流任务菜单操作类
  * 提供一个统一的入口，点击后弹出包含多个操作的子菜单
  */
@@ -143,33 +155,143 @@ class WorkflowMenuAction(
                     popup.add(generateTestsAction)
                 } else {
                      val retryAction = JMenuItem("重试")
-                    retryAction.addActionListener {
-                        try {
-                            println("WorkflowMenuAction: 重试按钮被点击")
-                            val newAction = RetryTaskAction()
-                            val newEvent = createActionEvent(e, project, editor)
-                            newAction.actionPerformed(newEvent)
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            println("WorkflowMenuAction: 重试失败 - ${ex.message}")
-                        }
-                    }
+                     retryAction.addActionListener {
+                         try {
+                             println("WorkflowMenuAction: 重试按钮被点击")
+                             
+                             // 尝试从事件上下文获取行号
+                             val currentLineNumber = try {
+                                 // 直接使用构造函数中传入的 taskText 来匹配任务块
+                                 val document = editor?.document
+                                 if (document != null) {
+                                     // 使用 TaskBlockParser 找到当前点击的任务
+                                     val taskBlocks = com.sina.weibo.agent.extensions.plugin.costrict.TaskBlockParser.parseTaskBlocks(document)
+                                     println("WorkflowMenuAction: 找到 ${taskBlocks.size} 个任务块")
+                                     println("WorkflowMenuAction: 当前任务文本: '$taskText'")
+                                     
+                                     val matchedBlock = taskBlocks.findWithIndex { block ->
+                                         val startOffset = document.getLineStartOffset(block.startLine)
+                                         val endOffset = document.getLineEndOffset(block.endLine)
+                                         val blockText = document.getText(
+                                             com.intellij.openapi.util.TextRange(startOffset, endOffset)
+                                         )
+                                         
+                                         println("WorkflowMenuAction: 检查任务块，行范围 ${block.startLine}-${block.endLine}")
+                                         println("WorkflowMenuAction: 任务块文本: '${blockText.trim()}'")
+                                         
+                                         // 检查任务文本是否匹配（使用多种匹配策略）
+                                         val trimmedTaskText = taskText.trim()
+                                         val trimmedBlockText = blockText.trim()
+                                         
+                                         trimmedBlockText.contains(trimmedTaskText) ||
+                                         trimmedTaskText.contains(trimmedBlockText.take(50)) ||
+                                         blockText.startsWith(taskText.trim()) ||
+                                         taskText.trim().startsWith(blockText.trim().take(50))
+                                     }
+                                     
+                                     println("WorkflowMenuAction: 匹配到的任务块索引: ${matchedBlock?.first}")
+                                     matchedBlock?.second?.startLine
+                                 } else {
+                                     null
+                                 }
+                             } catch (ex: Exception) {
+                                 println("WorkflowMenuAction: 从事件获取行号失败: ${ex.message}")
+                                 ex.printStackTrace()
+                                 null
+                             } ?: run {
+                                 // 回退到光标位置
+                                 editor?.let {
+                                     val caretModel = it.caretModel
+                                     it.document.getLineNumber(caretModel.offset)
+                                 }
+                             }
+                             
+                             println("WorkflowMenuAction: 获取到行号: $currentLineNumber")
+                             
+                             // 创建带行号的 RetryTaskAction
+                             val newAction = if (currentLineNumber != null) {
+                                 RetryTaskAction(currentLineNumber)
+                             } else {
+                                 RetryTaskAction()
+                             }
+                             val newEvent = createActionEvent(e, project, editor)
+                             newAction.actionPerformed(newEvent)
+                         } catch (ex: Exception) {
+                             ex.printStackTrace()
+                             println("WorkflowMenuAction: 重试失败 - ${ex.message}")
+                         }
+                     }
                     popup.add(retryAction)
                 }
             }
             TaskStatus.COMPLETED -> {
                 val retryAction = JMenuItem("重试")
-                retryAction.addActionListener {
-                    try {
-                        println("WorkflowMenuAction: 重试按钮被点击")
-                        val newAction = RetryTaskAction()
-                        val newEvent = createActionEvent(e, project, editor)
-                        newAction.actionPerformed(newEvent)
-                    } catch (ex: Exception) {
-                        ex.printStackTrace()
-                        println("WorkflowMenuAction: 重试失败 - ${ex.message}")
-                    }
-                }
+               retryAction.addActionListener {
+                   try {
+                       println("WorkflowMenuAction: 重试按钮被点击")
+                       
+                       // 尝试从事件上下文获取行号
+                       val currentLineNumber = try {
+                           // 直接使用构造函数中传入的 taskText 来匹配任务块
+                           val document = editor?.document
+                           if (document != null) {
+                               // 使用 TaskBlockParser 找到当前点击的任务
+                               val taskBlocks = com.sina.weibo.agent.extensions.plugin.costrict.TaskBlockParser.parseTaskBlocks(document)
+                               println("WorkflowMenuAction: 找到 ${taskBlocks.size} 个任务块")
+                               println("WorkflowMenuAction: 当前任务文本: '$taskText'")
+                               
+                               val matchedBlock = taskBlocks.findWithIndex { block ->
+                                   val startOffset = document.getLineStartOffset(block.startLine)
+                                   val endOffset = document.getLineEndOffset(block.endLine)
+                                   val blockText = document.getText(
+                                       com.intellij.openapi.util.TextRange(startOffset, endOffset)
+                                   )
+                                   
+                                   println("WorkflowMenuAction: 检查任务块，行范围 ${block.startLine}-${block.endLine}")
+                                   println("WorkflowMenuAction: 任务块文本: '${blockText.trim()}'")
+                                   
+                                   // 检查任务文本是否匹配（使用多种匹配策略）
+                                   val trimmedTaskText = taskText.trim()
+                                   val trimmedBlockText = blockText.trim()
+                                   
+                                   trimmedBlockText.contains(trimmedTaskText) ||
+                                   trimmedTaskText.contains(trimmedBlockText.take(50)) ||
+                                   blockText.startsWith(taskText.trim()) ||
+                                   taskText.trim().startsWith(blockText.trim().take(50))
+                               }
+                               
+                               println("WorkflowMenuAction: 匹配到的任务块索引: ${matchedBlock?.first}")
+                               matchedBlock?.second?.startLine
+                           } else {
+                               null
+                           }
+                       } catch (ex: Exception) {
+                           println("WorkflowMenuAction: 从事件获取行号失败: ${ex.message}")
+                           ex.printStackTrace()
+                           null
+                       } ?: run {
+                           // 回退到光标位置
+                           editor?.let {
+                               val caretModel = it.caretModel
+                               it.document.getLineNumber(caretModel.offset)
+                           }
+                       }
+                       
+                       println("WorkflowMenuAction: 获取到行号: $currentLineNumber")
+                       
+                       // 创建带行号的 RetryTaskAction
+                       val newAction = if (currentLineNumber != null) {
+                           RetryTaskAction(currentLineNumber)
+                       } else {
+                           RetryTaskAction()
+                       }
+                       val newEvent = createActionEvent(e, project, editor)
+                       newAction.actionPerformed(newEvent)
+                   } catch (ex: Exception) {
+                       ex.printStackTrace()
+                       println("WorkflowMenuAction: 重试失败 - ${ex.message}")
+                   }
+               }
                 popup.add(retryAction)
                 
                 // 只有第一个任务才显示"运行所有任务"和"生成测试用例"

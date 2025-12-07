@@ -48,8 +48,22 @@ class TasksFileHandler : FileTypeHandler {
                 isFirstTask = true
             )
         } else {
-            // 其他任务使用单独的RunTaskAction
-            com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
+            // 根据任务状态创建不同的Action
+            when (determineTaskStatus(trimmedText)) {
+                WorkflowMenuAction.TaskStatus.PENDING -> {
+                    // 待执行任务使用 RunTaskAction
+                    com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
+                }
+                WorkflowMenuAction.TaskStatus.IN_PROGRESS,
+                WorkflowMenuAction.TaskStatus.COMPLETED -> {
+                    // 进行中或已完成任务使用 RetryTaskAction
+                    com.sina.weibo.agent.actions.RetryTaskAction(lineNumber)
+                }
+                else -> {
+                    // 默认使用 RunTaskAction
+                    com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
+                }
+            }
         }
         
         val statusText = getStatusText(status)
