@@ -34,15 +34,41 @@ class RunAllTasksAction : WorkflowActionBase(
         
         val document = editor.document
         val caretModel = editor.caretModel
-        val lineNumber = document.getLineNumber(caretModel.offset)
+        val lineNumber = document.getLineNumber(caretModel.offset)+1
         
         // 获取整个 tasks.md 内容
         val allTasksContent = getFileContent(editor)
+        
+        // 获取选中文本（用于传递给 VSCode 扩展）
+        val selectionModel = editor.selectionModel
+        val selectedText = if (selectionModel.hasSelection()) {
+            selectionModel.selectedText
+        } else {
+            // 如果没有选中文本，使用当前行文本作为 selectedText
+            val lineStartOffset = document.getLineStartOffset(lineNumber)
+            val lineEndOffset = document.getLineEndOffset(lineNumber)
+            document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
+        }
+        
+        val startLine = if (selectionModel.hasSelection()) {
+            document.getLineNumber(selectionModel.selectionStart) +1 
+        } else {
+            lineNumber
+        }
+        
+        val endLine = if (selectionModel.hasSelection()) {
+            document.getLineNumber(selectionModel.selectionEnd) +1 
+        } else {
+            lineNumber
+        }
         
         return WorkflowActionParams(
             filePath = virtualFile.path,
             documentType = "tasks",
             lineNumber = lineNumber,
+            selectedText = selectedText,
+            startLine = startLine,
+            endLine = endLine,
             allTasksContent = allTasksContent,
             actionType = "run_all"
         )

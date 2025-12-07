@@ -16,7 +16,7 @@ class TaskLineBackgroundProviderInitializer : StartupActivity {
     private var taskLineBackgroundProvider: TaskLineBackgroundProvider? = null
     
     override fun runActivity(project: Project) {
-        println("TaskLineBackgroundProviderInitializer: 开始初始化项目 $project")
+        // println("TaskLineBackgroundProviderInitializer: 开始初始化项目 $project")
         
         // 初始化任务行背景提供者
         taskLineBackgroundProvider = TaskLineBackgroundProvider()
@@ -24,11 +24,11 @@ class TaskLineBackgroundProviderInitializer : StartupActivity {
         
         // 修复：确保在项目关闭时清理资源
         Disposer.register(project, {
-            println("TaskLineBackgroundProviderInitializer: 项目关闭，清理资源")
+            // println("TaskLineBackgroundProviderInitializer: 项目关闭，清理资源")
             dispose()
         })
         
-        println("TaskLineBackgroundProviderInitializer: 初始化完成")
+        // println("TaskLineBackgroundProviderInitializer: 初始化完成")
     }
     
     /**

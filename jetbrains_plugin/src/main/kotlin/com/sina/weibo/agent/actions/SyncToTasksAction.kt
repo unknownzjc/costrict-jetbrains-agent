@@ -39,10 +39,36 @@ class SyncToTasksAction : WorkflowActionBase(
         // 获取整个 design.md 内容
         val designContent = getFileContent(editor)
         
+        // 获取选中文本（用于传递给 VSCode 扩展）
+        val selectionModel = editor.selectionModel
+        val selectedText = if (selectionModel.hasSelection()) {
+            selectionModel.selectedText
+        } else {
+            // 如果没有选中文本，使用当前行文本作为 selectedText
+            val lineStartOffset = document.getLineStartOffset(lineNumber)
+            val lineEndOffset = document.getLineEndOffset(lineNumber)
+            document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
+        }
+        
+        val startLine = if (selectionModel.hasSelection()) {
+            document.getLineNumber(selectionModel.selectionStart)
+        } else {
+            lineNumber
+        }
+        
+        val endLine = if (selectionModel.hasSelection()) {
+            document.getLineNumber(selectionModel.selectionEnd)
+        } else {
+            lineNumber
+        }
+        
         return WorkflowActionParams(
             filePath = virtualFile.path,
             documentType = "design",
             lineNumber = lineNumber,
+            selectedText = selectedText,
+            startLine = startLine,
+            endLine = endLine,
             designContent = designContent,
             actionType = "sync_to_tasks"
         )

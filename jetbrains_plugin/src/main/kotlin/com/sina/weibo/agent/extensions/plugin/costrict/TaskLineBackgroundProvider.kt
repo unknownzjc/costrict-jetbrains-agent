@@ -51,7 +51,7 @@ class TaskLineBackgroundProvider {
      * 初始化提供者
      */
     fun init() {
-        println("TaskLineBackgroundProvider: 开始初始化")
+        // println("TaskLineBackgroundProvider: 开始初始化")
         
         // 订阅文件编辑器事件
         connection = ApplicationManager.getApplication().messageBus.connect()
@@ -59,17 +59,17 @@ class TaskLineBackgroundProvider {
         // 监听文件打开事件
         connection?.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
             override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-                println("TaskLineBackgroundProvider: 文件打开事件 - ${file.path}")
+                // println("TaskLineBackgroundProvider: 文件打开事件 - ${file.path}")
                 if (isTasksFile(file)) {
-                    println("TaskLineBackgroundProvider: 识别为 tasks.md 文件，开始更新背景")
+                    // println("TaskLineBackgroundProvider: 识别为 tasks.md 文件，开始更新背景")
                     updateBackgrounds(source.project, file)
                 } else {
-                    println("TaskLineBackgroundProvider: 不是 tasks.md 文件，跳过")
+                    // println("TaskLineBackgroundProvider: 不是 tasks.md 文件，跳过")
                 }
             }
             
             override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-                println("TaskLineBackgroundProvider: 文件关闭事件 - ${file.path}")
+                // println("TaskLineBackgroundProvider: 文件关闭事件 - ${file.path}")
                 if (isTasksFile(file)) {
                     clearBackgrounds(source, file)
                 }
@@ -82,9 +82,9 @@ class TaskLineBackgroundProvider {
                 for (event in events) {
                     if (event is VFileContentChangeEvent) {
                         val file = event.file
-                        println("TaskLineBackgroundProvider: 文件内容变化事件 - ${file.path}")
+                        // println("TaskLineBackgroundProvider: 文件内容变化事件 - ${file.path}")
                         if (isTasksFile(file)) {
-                            println("TaskLineBackgroundProvider: 识别为 tasks.md 文件，开始更新背景")
+                            // println("TaskLineBackgroundProvider: 识别为 tasks.md 文件，开始更新背景")
                             // 遍历所有项目，找到包含该文件的项目
                             ProjectManager.getInstance().openProjects.forEach { project ->
                                 ApplicationManager.getApplication().invokeLater {
@@ -100,21 +100,21 @@ class TaskLineBackgroundProvider {
                                 }
                             }
                         } else {
-                            println("TaskLineBackgroundProvider: 不是 tasks.md 文件，跳过")
+                            // println("TaskLineBackgroundProvider: 不是 tasks.md 文件，跳过")
                         }
                     }
                 }
             }
         })
         
-        println("TaskLineBackgroundProvider: 初始化完成")
+        // println("TaskLineBackgroundProvider: 初始化完成")
     }
     
     /**
      * 清理资源
      */
     fun dispose() {
-        println("TaskLineBackgroundProvider: 开始清理资源")
+        // println("TaskLineBackgroundProvider: 开始清理资源")
         connection?.disconnect()
         connection = null
         
@@ -125,7 +125,7 @@ class TaskLineBackgroundProvider {
             }
         }
         editorHighlighters.clear()
-        println("TaskLineBackgroundProvider: 资源清理完成")
+        // println("TaskLineBackgroundProvider: 资源清理完成")
     }
     
     /**
@@ -133,7 +133,7 @@ class TaskLineBackgroundProvider {
      */
     private fun isTasksFile(file: VirtualFile): Boolean {
         val result = file.name == "tasks.md" && file.path.contains("/.cospec/")
-        println("TaskLineBackgroundProvider: 文件检查 - ${file.path}，是否为 tasks.md: ${file.name == "tasks.md"}，是否在 .cospec 目录: ${file.path.contains("/.cospec/")}，结果: $result")
+        // println("TaskLineBackgroundProvider: 文件检查 - ${file.path}，是否为 tasks.md: ${file.name == "tasks.md"}，是否在 .cospec 目录: ${file.path.contains("/.cospec/")}，结果: $result")
         return result
     }
     
@@ -160,9 +160,9 @@ class TaskLineBackgroundProvider {
             val document = FileDocumentManager.getInstance().getDocument(file) ?: return@runReadAction
             
             // 添加日志：调试信息
-            println("TaskLineBackgroundProvider: 开始处理文件 ${file.path}")
-            println("TaskLineBackgroundProvider: 文档行数 ${document.lineCount}")
-            println("TaskLineBackgroundProvider: 编辑器实例 ${editor.javaClass.simpleName}")
+            // println("TaskLineBackgroundProvider: 开始处理文件 ${file.path}")
+            // println("TaskLineBackgroundProvider: 文档行数 ${document.lineCount}")
+            // println("TaskLineBackgroundProvider: 编辑器实例 ${editor.javaClass.simpleName}")
             
             // 清除之前的高亮器
             clearBackgroundsForEditor(editor)
@@ -174,10 +174,10 @@ class TaskLineBackgroundProvider {
             for (taskBlock in taskBlocks) {
                 createTaskBlockHighlighter(editor, document, taskBlock.startLine, taskBlock.endLine, taskBlock.status)
                 taskBlockCount++
-                println("TaskLineBackgroundProvider: 创建任务块 ${taskBlockCount}，行 ${taskBlock.startLine}-${taskBlock.endLine}，状态 ${taskBlock.status}")
+                // println("TaskLineBackgroundProvider: 创建任务块 ${taskBlockCount}，行 ${taskBlock.startLine}-${taskBlock.endLine}，状态 ${taskBlock.status}")
             }
             
-            println("TaskLineBackgroundProvider: 处理完成，共识别 $taskBlockCount 个任务块")
+            // println("TaskLineBackgroundProvider: 处理完成，共识别 $taskBlockCount 个任务块")
         }
     }
     
@@ -217,8 +217,8 @@ class TaskLineBackgroundProvider {
                 val isContinuation = isTaskBlockContinuation(lineText)
                 val isEmptyLine = lineText.trim().isEmpty()
                 
-                println("TaskLineBackgroundProvider: 行 $line 文本: '$lineText'")
-                println("TaskLineBackgroundProvider: 是否延续: $isContinuation, 是否空行: $isEmptyLine")
+                // println("TaskLineBackgroundProvider: 行 $line 文本: '$lineText'")
+                // println("TaskLineBackgroundProvider: 是否延续: $isContinuation, 是否空行: $isEmptyLine")
                 
                 // 如果不是任务块的延续或者是空行，结束当前任务块
                 if (!isContinuation || isEmptyLine) {
@@ -246,20 +246,20 @@ class TaskLineBackgroundProvider {
         
         // 空行不是任务块的延续
         if (trimmedText.isEmpty()) {
-            println("TaskLineBackgroundProvider: 行为空，不是任务块延续")
+            // println("TaskLineBackgroundProvider: 行为空，不是任务块延续")
             return false
         }
         
         // 如果是新的任务项，则不是前一个任务块的延续
         val taskMatcher = TASK_PATTERN.matcher(trimmedText)
         if (taskMatcher.find()) {
-            println("TaskLineBackgroundProvider: 发现新任务项，不是前一个任务块的延续")
+            // println("TaskLineBackgroundProvider: 发现新任务项，不是前一个任务块的延续")
             return false
         }
         
         // Markdown 标题行不是子内容
         if (trimmedText.startsWith("#")) {
-            println("TaskLineBackgroundProvider: 发现 Markdown 标题，不是任务块延续")
+            // println("TaskLineBackgroundProvider: 发现 Markdown 标题，不是任务块延续")
             return false
         }
         
@@ -277,7 +277,7 @@ class TaskLineBackgroundProvider {
         val result = isIndented
         
         // 添加详细日志
-        println("TaskLineBackgroundProvider: 任务块延续判断:")
+        // println("TaskLineBackgroundProvider: 任务块延续判断:")
         println("  原始文本: '$lineText'")
         println("  去除空格后: '$trimmedText'")
         println("  是否缩进: $isIndented")
@@ -303,7 +303,7 @@ class TaskLineBackgroundProvider {
         }
         
         // 添加日志：调试范围计算
-        println("TaskLineBackgroundProvider: 创建高亮器 - 行 $startLine-$endLine，偏移 $startOffset-$endOffset，状态 $status")
+        // println("TaskLineBackgroundProvider: 创建高亮器 - 行 $startLine-$endLine，偏移 $startOffset-$endOffset，状态 $status")
         
         // 根据任务状态确定背景色
         val color = when (status) {
@@ -312,7 +312,7 @@ class TaskLineBackgroundProvider {
             else -> DEFAULT_BACKGROUND // 默认：透明背景
         }
         
-        println("TaskLineBackgroundProvider: 背景色 $color")
+        // println("TaskLineBackgroundProvider: 背景色 $color")
         
         // 修复：使用 WHOLE_LINE 而不是 EXACT_RANGE 来确保整行高亮
         val markupModel = editor.markupModel
@@ -328,7 +328,7 @@ class TaskLineBackgroundProvider {
         // 存储高亮器以便后续清理
         editorHighlighters.getOrPut(editor) { mutableListOf() }.add(highlighter)
         
-        println("TaskLineBackgroundProvider: 高亮器已创建并添加，当前编辑器共有 ${editorHighlighters[editor]?.size} 个高亮器")
+        // println("TaskLineBackgroundProvider: 高亮器已创建并添加，当前编辑器共有 ${editorHighlighters[editor]?.size} 个高亮器")
     }
     
     /**
@@ -336,7 +336,7 @@ class TaskLineBackgroundProvider {
      */
     private fun clearBackgroundsForEditor(editor: Editor) {
         val highlighters = editorHighlighters[editor] ?: return
-        println("TaskLineBackgroundProvider: 清理编辑器的 ${highlighters.size} 个高亮器")
+        // println("TaskLineBackgroundProvider: 清理编辑器的 ${highlighters.size} 个高亮器")
         highlighters.forEach { it.dispose() }
         highlighters.clear()
     }

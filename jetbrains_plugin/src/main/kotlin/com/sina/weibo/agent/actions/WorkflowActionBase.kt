@@ -163,6 +163,7 @@ abstract class WorkflowActionBase(
     
     /**
      * 获取任务文本（用于 tasks.md）
+     * @param lineNumber 1-based 行号
      */
     protected fun getTaskText(editor: Editor, psiFile: PsiFile, lineNumber: Int): String? {
         if (!psiFile.name.endsWith(CostrictFileConstants.TASKS_FILE)) {
@@ -172,8 +173,11 @@ abstract class WorkflowActionBase(
         val document = editor.document
         val taskBlocks = TaskBlockParser.parseTaskBlocks(document)
         
+        // 将 1-based lineNumber 转换为 0-based 进行匹配
+        val zeroBasedLineNumber = lineNumber - 1
+        
         val currentTaskBlock = taskBlocks.find { block ->
-            lineNumber in block.startLine..block.endLine
+            zeroBasedLineNumber in block.startLine..block.endLine
         }
         
         return currentTaskBlock?.let { block ->

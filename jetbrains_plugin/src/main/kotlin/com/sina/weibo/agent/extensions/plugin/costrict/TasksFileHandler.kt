@@ -33,8 +33,11 @@ class TasksFileHandler : FileTypeHandler {
         val trimmedText = element.text.trimStart()
         val status = determineTaskStatus(trimmedText) ?: return null
         
-        // 直接使用 RunTaskAction，它会自动从编辑器上下文收集参数
-        val action = com.sina.weibo.agent.actions.RunTaskAction()
+        // 获取当前行号（0-based）
+        val lineNumber = document.getLineNumber(element.textOffset)
+        
+        // 创建带行号参数的 RunTaskAction
+        val action = com.sina.weibo.agent.actions.RunTaskAction(lineNumber)
         
         val statusText = getStatusText(status)
         return LineMarkerFactory.create(
