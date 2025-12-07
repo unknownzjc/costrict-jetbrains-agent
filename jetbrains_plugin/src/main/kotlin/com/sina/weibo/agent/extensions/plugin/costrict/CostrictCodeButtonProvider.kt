@@ -39,7 +39,7 @@ class CostrictCodeButtonProvider : ExtensionButtonProvider {
             // PromptsButtonClickAction(),
             // MCPButtonClickAction(),
             HistoryButtonClickAction(),
-            MarketplaceButtonClickAction(),
+            // MarketplaceButtonClickAction(),
             SettingsButtonClickAction(),
             AccountButtonClickAction(),
         )
