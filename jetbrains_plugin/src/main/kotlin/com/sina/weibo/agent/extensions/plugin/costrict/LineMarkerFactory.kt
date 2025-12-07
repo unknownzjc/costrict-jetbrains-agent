@@ -26,6 +26,7 @@ object LineMarkerFactory {
             icon,
             { tooltipText },
             { _, _ ->
+                // 创建包含完整上下文的事件
                 val event = AnActionEvent.createFromDataContext(
                     "WorkflowLineMarker",
                     null,
@@ -33,6 +34,13 @@ object LineMarkerFactory {
                         when (dataId) {
                             CommonDataKeys.PROJECT.name -> element.project
                             CommonDataKeys.PSI_ELEMENT.name -> element
+                            CommonDataKeys.VIRTUAL_FILE.name -> element.containingFile?.virtualFile
+                            CommonDataKeys.EDITOR.name -> {
+                                // 从 FileEditorManager 获取当前编辑器
+                                element.project?.let { project ->
+                                    com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).selectedTextEditor
+                                }
+                            }
                             else -> null
                         }
                     }

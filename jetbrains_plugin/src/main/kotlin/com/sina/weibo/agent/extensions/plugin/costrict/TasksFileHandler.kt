@@ -33,8 +33,8 @@ class TasksFileHandler : FileTypeHandler {
         val trimmedText = element.text.trimStart()
         val status = determineTaskStatus(trimmedText) ?: return null
         
-        val isFirstTask = TaskBlockParser.isFirstTaskBlock(element)
-        val action = WorkflowMenuAction(status, trimmedText, isFirstTask)
+        // 直接使用 RunTaskAction，它会自动从编辑器上下文收集参数
+        val action = com.sina.weibo.agent.actions.RunTaskAction()
         
         val statusText = getStatusText(status)
         return LineMarkerFactory.create(

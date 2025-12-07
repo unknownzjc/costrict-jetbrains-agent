@@ -22,7 +22,8 @@ class RequirementsFileHandler : FileTypeHandler {
     }
     
     override fun createLineMarker(element: PsiElement, document: Document): LineMarkerInfo<*>? {
-        val action = SyncToDesignAction(CostrictFileConstants.TOOLTIP_SYNC_TO_DESIGN)
+        // 直接使用 SyncToDesignAction，它会自动从编辑器上下文收集参数
+        val action = com.sina.weibo.agent.actions.SyncToDesignAction()
         return LineMarkerFactory.create(
             element,
             AllIcons.Actions.CheckOut,
