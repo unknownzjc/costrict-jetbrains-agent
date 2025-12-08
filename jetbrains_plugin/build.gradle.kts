@@ -13,6 +13,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.13.3"
     id("org.jlleitschuh.gradle.ktlint") version "11.6.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.4"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 apply(from = "genPlatform.gradle")
@@ -293,6 +294,10 @@ tasks {
         // Wire task inputs for build cache/key stability
         inputs.property("build_mode", debugModeProp)
         inputs.property("vscode_plugin", vscodePluginProp)
+        
+        // Depend on shadowJar to ensure relocated classes are ready
+        dependsOn(shadowJar)
+        
         prepareSandbox()
     }
 
@@ -338,6 +343,35 @@ tasks {
 
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
+    }
+
+    // Configure shadowJar to relocate packages
+    shadowJar {
+        relocate("com.sina.weibo.agent", "ai.costrict")
+        // Don't use classifier so it replaces the normal jar
+        archiveClassifier.set("")
+        // Exclude META-INF signature files
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    }
+
+    // Replace the standard jar with shadowJar
+    jar {
+        // Make the regular jar task run shadowJar instead
+        finalizedBy(shadowJar)
+        // And disable the regular jar output
+        enabled = false
+    }
+    
+    // Ensure buildPlugin uses shadowJar
+    buildPlugin {
+        dependsOn(shadowJar)
+    }
+    
+    // Configure all PrepareSandboxTask to include shadowJar in the plugin distribution
+    withType<org.jetbrains.intellij.tasks.PrepareSandboxTask> {
+        from(shadowJar) {
+            into("${intellij.pluginName.get()}/lib")
+        }
     }
 }
 
