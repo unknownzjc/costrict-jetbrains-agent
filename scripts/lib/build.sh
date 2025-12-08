@@ -161,46 +161,55 @@ switch_costrict_version() {
         die "CoStrict submodule directory not found: $PLUGIN_BUILD_DIR"
     fi
     
-    # First, initialize and update submodule from main repository
-    log_debug "Initializing submodule from main repository..."
-    cd "$PROJECT_ROOT"
-    execute_cmd "git submodule sync --recursive" "sync submodule URLs"
-    execute_cmd "git submodule update --init --recursive" "initialize and update submodules"
-    
     cd "$PLUGIN_BUILD_DIR"
     
-    # Check if we are in a detached HEAD state and fix if needed
-    if git symbolic-ref -q HEAD >/dev/null 2>&1; then
-        log_debug "Currently on a branch, good state"
-    else
-        log_debug "Currently in detached HEAD state, checking out main first"
-        execute_cmd "git checkout main" "checkout main branch"
+    # Clean any uncommitted changes and untracked files in the submodule
+    log_debug "Cleaning CoStrict working directory..."
+    if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+        execute_cmd "git reset --hard HEAD" "reset CoStrict to clean state"
+        execute_cmd "git clean -ffdx" "remove all untracked files and directories"
     fi
     
     # Fetch latest from remote to ensure we have the specified version
-    execute_cmd "git fetch origin --tags --prune" "fetch latest from remote including tags"
+    log_debug "Fetching latest from CoStrict remote..."
+    # Use || true to prevent fetch errors from stopping the script
+    git fetch origin --tags --force --prune 2>&1 || {
+        log_warn "Fetch had some warnings, continuing..."
+    }
+    log_success "Fetched latest from remote"
     
-    # Check if the specified version exists (branch, tag, or commit)
+    # Check if the specified version exists (tag, branch, or commit)
     local target_commit=""
-    if git rev-parse --verify "origin/$COSTRICT_VERSION" >/dev/null 2>&1; then
+    local version_type=""
+    
+    # First try as a tag (most common for versions like v2.0.23)
+    if git rev-parse --verify "refs/tags/$COSTRICT_VERSION" >/dev/null 2>&1; then
+        target_commit="refs/tags/$COSTRICT_VERSION"
+        version_type="tag"
+        log_debug "Found tag: $COSTRICT_VERSION"
+    # Try as a remote branch
+    elif git rev-parse --verify "origin/$COSTRICT_VERSION" >/dev/null 2>&1; then
         target_commit="origin/$COSTRICT_VERSION"
+        version_type="branch"
         log_debug "Found remote branch: $COSTRICT_VERSION"
+    # Try as a local branch
     elif git rev-parse --verify "$COSTRICT_VERSION" >/dev/null 2>&1; then
         target_commit="$COSTRICT_VERSION"
+        version_type="reference"
         log_debug "Found local reference: $COSTRICT_VERSION"
     else
+        # List available tags and branches for debugging
+        log_error "CoStrict version '$COSTRICT_VERSION' not found"
+        log_info "Available tags:"
+        git tag -l | head -10
+        log_info "Available branches:"
+        git branch -r | grep -v HEAD | head -10
         die "CoStrict version '$COSTRICT_VERSION' not found. Please check the version/tag/branch name."
     fi
     
     # Switch to the specified version
-    execute_cmd "git checkout $target_commit" "switch to CoStrict version $COSTRICT_VERSION"
-    
-    # Ensure the working directory is clean
-    if [[ -n $(git status --porcelain) ]]; then
-        log_warn "Working directory is not clean, cleaning..."
-        execute_cmd "git reset --hard HEAD" "reset to clean state"
-        execute_cmd "git clean -fd" "remove untracked files"
-    fi
+    log_info "Switching to $version_type: $COSTRICT_VERSION"
+    execute_cmd "git checkout -f $target_commit" "switch to CoStrict version $COSTRICT_VERSION"
     
     # Show current commit info
     local current_commit=$(git rev-parse HEAD)
