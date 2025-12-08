@@ -13,7 +13,7 @@ import com.sina.weibo.agent.diff.DiffViewRegistrar
 import com.sina.weibo.agent.editor.registerOpenEditorAPICommands
 import com.sina.weibo.agent.terminal.registerTerminalAPICommands
 import com.sina.weibo.agent.util.doInvokeMethod
-import kotlin.reflect.full.functions
+import kotlin.coroutines.Continuation
 
 /**
  * Main thread commands interface.
@@ -147,20 +147,32 @@ class MainThreadCommands(val project: Project) : MainThreadCommandsShape {
     /**
      * Runs a command with the given arguments.
      * Finds the appropriate method on the command handler and invokes it.
+     * Uses Java reflection to avoid issues with shadowJar relocate not updating Kotlin metadata.
      *
      * @param cmd The command to run
      * @param args List of arguments for the command
      */
     private suspend fun runCmd(cmd: ICommand, args: List<Any?>) {
-        val handler = cmd.handler();
-        val method = try {
-//            handler.javaClass.methods.first { it.name == cmd.getMethod()}
-            handler::class.functions.first{ it.name == cmd.getMethod()}
-        }catch (e: Exception){
-            logger.error("Command method not found: ${cmd.getMethod()}")
+        val handler = cmd.handler()
+        val methodName = cmd.getMethod()
+
+        // Use Java reflection to find the method
+        val candidateMethods = handler.javaClass.methods.filter { it.name == methodName }
+        if (candidateMethods.isEmpty()) {
+            logger.error("Command method not found: $methodName")
             return
         }
-        doInvokeMethod(method,args,handler)
+
+        // Find the best matching method based on argument count
+        val method = candidateMethods.find { m ->
+            val paramTypes = m.parameterTypes
+            val isSuspend = paramTypes.isNotEmpty() &&
+                    Continuation::class.java.isAssignableFrom(paramTypes.last())
+            val actualParamCount = if (isSuspend) paramTypes.size - 1 else paramTypes.size
+            actualParamCount == args.size
+        } ?: candidateMethods.first()
+
+        doInvokeMethod(method, args, handler)
     }
 
 }

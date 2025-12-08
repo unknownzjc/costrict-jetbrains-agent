@@ -11,10 +11,11 @@ import com.sina.weibo.agent.ipc.proxy.uri.IURITransformer
 import com.sina.weibo.agent.ipc.proxy.uri.UriReplacer
 import com.sina.weibo.agent.util.doInvokeMethod
 import kotlinx.coroutines.*
+import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.full.functions
 
 /**
  * Request initiator
@@ -696,102 +697,139 @@ class RPCProtocol(
     }
 
     /**
-     * Find the best matching method based on method name and argument types
+     * Find the best matching method based on method name and argument types.
+     * Uses Java reflection instead of Kotlin reflection to avoid issues with
+     * shadowJar relocate not updating Kotlin metadata.
      */
-    private fun findBestMatchingMethod(actor: Any, methodName: String, args: List<Any?>): kotlin.reflect.KFunction<*> {
-        val candidateMethods = actor::class.functions.filter { it.name == methodName }
-        
+    private fun findBestMatchingMethod(actor: Any, methodName: String, args: List<Any?>): Method {
+        val candidateMethods = actor.javaClass.methods.filter { it.name == methodName }
+
         if (candidateMethods.isEmpty()) {
             throw NoSuchMethodException("No method named '$methodName' found")
         }
-        
+
         if (candidateMethods.size == 1) {
             return candidateMethods.first()
         }
-        
-        // Find method with matching parameter count (excluding the receiver parameter)
+
+        // For suspend functions, the continuation parameter is added by the compiler
+        // So we need to account for that when counting parameters
         val methodsWithMatchingParamCount = candidateMethods.filter { method ->
-            val paramCount = method.parameters.size - 1 // Exclude receiver parameter
-            paramCount == args.size
+            val paramTypes = method.parameterTypes
+            val isSuspend = paramTypes.isNotEmpty() &&
+                    Continuation::class.java.isAssignableFrom(paramTypes.last())
+            val actualParamCount = if (isSuspend) paramTypes.size - 1 else paramTypes.size
+            actualParamCount == args.size
         }
-        
+
         if (methodsWithMatchingParamCount.isEmpty()) {
             // If no exact parameter count match, try to find a method that can accept the arguments
             val compatibleMethods = candidateMethods.filter { method ->
-                val paramCount = method.parameters.size - 1
-                paramCount >= args.size // Method can accept fewer arguments (with defaults)
+                val paramTypes = method.parameterTypes
+                val isSuspend = paramTypes.isNotEmpty() &&
+                        Continuation::class.java.isAssignableFrom(paramTypes.last())
+                val actualParamCount = if (isSuspend) paramTypes.size - 1 else paramTypes.size
+                actualParamCount >= args.size // Method can accept fewer arguments (with defaults)
             }
             if (compatibleMethods.isNotEmpty()) {
                 return compatibleMethods.first()
             }
             throw NoSuchMethodException("No method '$methodName' with ${args.size} parameters found")
         }
-        
+
         if (methodsWithMatchingParamCount.size == 1) {
             return methodsWithMatchingParamCount.first()
         }
-        
+
         // Multiple methods with same parameter count, try to match by type
         for (method in methodsWithMatchingParamCount) {
             if (isMethodCompatible(method, args)) {
                 return method
             }
         }
-        
+
         // If no perfect match, return the first one with matching parameter count
         return methodsWithMatchingParamCount.first()
     }
-    
+
     /**
-     * Check if a method is compatible with the given arguments
+     * Check if a method is compatible with the given arguments.
+     * Uses Java reflection instead of Kotlin reflection.
      */
-    private fun isMethodCompatible(method: kotlin.reflect.KFunction<*>, args: List<Any?>): Boolean {
-        val parameters = method.parameters.drop(1) // Skip receiver parameter
-        
-        if (parameters.size != args.size) {
+    private fun isMethodCompatible(method: Method, args: List<Any?>): Boolean {
+        val paramTypes = method.parameterTypes
+        val isSuspend = paramTypes.isNotEmpty() &&
+                Continuation::class.java.isAssignableFrom(paramTypes.last())
+        val actualParamCount = if (isSuspend) paramTypes.size - 1 else paramTypes.size
+
+        if (actualParamCount != args.size) {
             return false
         }
-        
-        for (i in parameters.indices) {
-            val param = parameters[i]
+
+        for (i in 0 until actualParamCount) {
+            val paramClass = paramTypes[i]
             val arg = args[i]
-            
+
             if (arg == null) {
-                // Null argument is compatible with nullable parameters
-                if (!param.type.isMarkedNullable) {
+                // Null argument is compatible with non-primitive parameters
+                if (paramClass.isPrimitive) {
                     return false
                 }
             } else {
                 // Check type compatibility
                 val argClass = arg::class.java
-                val paramClass = param.type.classifier as? kotlin.reflect.KClass<*>
-                
-                if (paramClass != null) {
-                    val paramJavaClass = paramClass.java
-                    
-                    // Handle primitive type conversions (similar to doInvokeMethod)
-                    val isCompatible = when {
-                        paramJavaClass.isAssignableFrom(argClass) -> true
-                        // Handle Double to numeric type conversions
-                        arg is Double && (paramJavaClass == Int::class.java ||
-                                         paramJavaClass == Long::class.java ||
-                                         paramJavaClass == Float::class.java ||
-                                         paramJavaClass == Short::class.java ||
-                                         paramJavaClass == Byte::class.java ||
-                                         paramJavaClass == Boolean::class.java) -> true
-                        // Handle String compatibility
-                        arg is String && paramJavaClass == String::class.java -> true
-                        else -> false
-                    }
-                    
-                    if (!isCompatible) {
-                        return false
-                    }
+
+                // Handle primitive type conversions (similar to doInvokeMethod)
+                val isCompatible = when {
+                    paramClass.isAssignableFrom(argClass) -> true
+                    // Handle boxed types
+                    isBoxedAssignable(paramClass, argClass) -> true
+                    // Handle Double to numeric type conversions
+                    arg is Double && isNumericOrBoolean(paramClass) -> true
+                    // Handle String compatibility
+                    arg is String && paramClass == String::class.java -> true
+                    // Handle Map to String conversion for ExtensionIdentifier
+                    arg is Map<*, *> && paramClass == String::class.java -> true
+                    else -> false
+                }
+
+                if (!isCompatible) {
+                    return false
                 }
             }
         }
-        
+
         return true
+    }
+
+    /**
+     * Check if the argument class can be assigned to the parameter class,
+     * considering boxed/primitive type conversions.
+     */
+    private fun isBoxedAssignable(paramClass: Class<*>, argClass: Class<*>): Boolean {
+        return when (paramClass) {
+            Int::class.java, Integer::class.java -> argClass == Int::class.java || argClass == Integer::class.java
+            Long::class.java, java.lang.Long::class.java -> argClass == Long::class.java || argClass == java.lang.Long::class.java
+            Double::class.java, java.lang.Double::class.java -> argClass == Double::class.java || argClass == java.lang.Double::class.java
+            Float::class.java, java.lang.Float::class.java -> argClass == Float::class.java || argClass == java.lang.Float::class.java
+            Boolean::class.java, java.lang.Boolean::class.java -> argClass == Boolean::class.java || argClass == java.lang.Boolean::class.java
+            Short::class.java, java.lang.Short::class.java -> argClass == Short::class.java || argClass == java.lang.Short::class.java
+            Byte::class.java, java.lang.Byte::class.java -> argClass == Byte::class.java || argClass == java.lang.Byte::class.java
+            Char::class.java, java.lang.Character::class.java -> argClass == Char::class.java || argClass == java.lang.Character::class.java
+            else -> false
+        }
+    }
+
+    /**
+     * Check if the class is a numeric type or boolean.
+     */
+    private fun isNumericOrBoolean(clazz: Class<*>): Boolean {
+        return clazz == Int::class.java || clazz == Integer::class.java ||
+                clazz == Long::class.java || clazz == java.lang.Long::class.java ||
+                clazz == Float::class.java || clazz == java.lang.Float::class.java ||
+                clazz == Short::class.java || clazz == java.lang.Short::class.java ||
+                clazz == Byte::class.java || clazz == java.lang.Byte::class.java ||
+                clazz == Boolean::class.java || clazz == java.lang.Boolean::class.java
     }
 
 

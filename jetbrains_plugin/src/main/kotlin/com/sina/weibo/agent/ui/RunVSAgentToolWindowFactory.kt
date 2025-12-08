@@ -55,7 +55,7 @@ class RunVSAgentToolWindowFactory : ToolWindowFactory {
 
         // toolbar
         val titleActions = mutableListOf<AnAction>()
-        val action = ActionManager.getInstance().getAction("WecoderToolbarGroup")
+        val action = ActionManager.getInstance().getAction("CoStrict.ToolbarGroup")
         if (action != null) {
             titleActions.add(action)
         }
