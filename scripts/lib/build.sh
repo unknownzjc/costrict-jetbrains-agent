@@ -25,6 +25,7 @@ SKIP_BASE_BUILD=false
 SKIP_IDEA_BUILD=false
 SKIP_NODEJS_PREPARE=false
 COSTRICT_VERSION=""
+LITE_BUILD=false
 
 # Node.js configuration
 readonly NODEJS_VERSION="20.6.0"
@@ -455,6 +456,12 @@ copy_base_debug_resources() {
 download_nodejs_binary() {
     local platform="$1"
     local filename="${NODEJS_PLATFORMS[$platform]}"
+    
+    # Validate platform is supported for pre-built Node.js
+    if [[ -z "$filename" ]]; then
+        die "Platform '$platform' is not supported for full plugin build. Supported platforms: ${!NODEJS_PLATFORMS[@]}. Use --lite flag to build lite plugin which supports more platforms via online download."
+    fi
+    
     local url="$NODEJS_DOWNLOAD_BASE_URL/$filename"
     local cache_file="$NODEJS_CACHE_DIR/$filename"
     local target_dir="$BUILTIN_NODEJS_DIR/$platform"
@@ -621,7 +628,7 @@ prepare_builtin_nodejs_prebuild() {
 
     # Copy asset files (setup scripts) to resources directory
     local asset_target_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
-    copy_asset_files "$asset_target_dir"
+    copy_asset_files "$asset_target_dir" "all"
 }
 
 # Prepare builtin Node.js for specific platform
@@ -630,6 +637,18 @@ prepare_builtin_nodejs_prebuild_for_platform() {
 
     if [[ "$SKIP_NODEJS_PREPARE" == "true" ]]; then
         log_info "Skipping Node.js pre-build preparation (SKIP_NODEJS_PREPARE=true)"
+        return 0
+    fi
+
+    # For lite build, we prepare online setup scripts instead of builtin Node.js
+    if [[ "$LITE_BUILD" == "true" ]]; then
+        log_step "Preparing online setup scripts for lite build..."
+        
+        # Copy online asset files (setup scripts) to resources directory
+        local asset_target_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
+        copy_online_asset_files "$asset_target_dir" "$target_platform"
+        
+        log_success "Online setup scripts prepared for lite build"
         return 0
     fi
 
@@ -652,16 +671,19 @@ prepare_builtin_nodejs_prebuild_for_platform() {
 
     # Copy asset files (setup scripts) to resources directory
     local asset_target_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
-    copy_asset_files "$asset_target_dir"
+    copy_asset_files "$asset_target_dir" "$target_platform"
 }
 
 # Copy asset files (setup scripts) to target directory
 # Used by prepare_builtin_nodejs_prebuild to copy to resources directory
+# Only copies builtin version scripts (setup-node.sh/bat), not online versions
+# Args: target_dir, platform (windows-x64, linux-x64, macos-x64, macos-arm64, all)
 copy_asset_files() {
     local target_dir="$1"
+    local platform="${2:-all}"
     local asset_dir="$PROJECT_ROOT/scripts/asset"
     
-    log_step "Copying asset files (setup scripts)..."
+    log_step "Copying asset files (setup scripts for builtin Node.js, platform: $platform)..."
     log_debug "Asset directory: $asset_dir"
     log_debug "Target directory: $target_dir"
     
@@ -673,26 +695,104 @@ copy_asset_files() {
     # Ensure target directory exists
     ensure_dir "$target_dir"
     
-    # Copy all files from asset directory
-    for file in "$asset_dir"/*; do
-        if [[ -f "$file" ]]; then
-            local filename=$(basename "$file")
-            log_debug "Copying: $filename"
-            copy_files "$file" "$target_dir/$filename" "$filename"
-        fi
-    done
-    
-    # Make shell scripts executable
-    if [[ -f "$target_dir/setup-node.sh" ]]; then
-        chmod +x "$target_dir/setup-node.sh"
-        log_debug "Made setup-node.sh executable"
-    fi
-    if [[ -f "$target_dir/setup-node.bat" ]]; then
-        chmod +x "$target_dir/setup-node.bat"
-        log_debug "Made setup-node.bat executable"
-    fi
+    # Copy platform-specific setup scripts
+    case "$platform" in
+        windows-*)
+            # Windows platform: only copy .bat script
+            if [[ -f "$asset_dir/setup-node.bat" ]]; then
+                copy_files "$asset_dir/setup-node.bat" "$target_dir/setup-node.bat" "setup-node.bat"
+                chmod +x "$target_dir/setup-node.bat"
+                log_debug "Copied setup-node.bat for Windows"
+            fi
+            ;;
+        linux-*|macos-*)
+            # Linux/macOS platform: only copy .sh script
+            if [[ -f "$asset_dir/setup-node.sh" ]]; then
+                copy_files "$asset_dir/setup-node.sh" "$target_dir/setup-node.sh" "setup-node.sh"
+                chmod +x "$target_dir/setup-node.sh"
+                log_debug "Copied setup-node.sh for Linux/macOS"
+            fi
+            ;;
+        all)
+            # Universal build: copy both scripts
+            if [[ -f "$asset_dir/setup-node.sh" ]]; then
+                copy_files "$asset_dir/setup-node.sh" "$target_dir/setup-node.sh" "setup-node.sh"
+                chmod +x "$target_dir/setup-node.sh"
+                log_debug "Copied setup-node.sh"
+            fi
+            if [[ -f "$asset_dir/setup-node.bat" ]]; then
+                copy_files "$asset_dir/setup-node.bat" "$target_dir/setup-node.bat" "setup-node.bat"
+                chmod +x "$target_dir/setup-node.bat"
+                log_debug "Copied setup-node.bat"
+            fi
+            ;;
+        *)
+            log_warn "Unknown platform: $platform, skipping asset files"
+            return 0
+            ;;
+    esac
     
     log_success "Asset files copied to: $target_dir"
+}
+
+# Copy online asset files (setup scripts) for lite build
+# Used by build_lite_plugin to copy online setup scripts
+# Args: target_dir, platform (windows-x64, linux-x64, macos-x64, macos-arm64, all, lite)
+copy_online_asset_files() {
+    local target_dir="$1"
+    local platform="${2:-all}"
+    local asset_dir="$PROJECT_ROOT/scripts/asset"
+    
+    log_step "Copying online asset files (setup scripts for lite build, platform: $platform)..."
+    log_debug "Asset directory: $asset_dir"
+    log_debug "Target directory: $target_dir"
+    
+    if [[ ! -d "$asset_dir" ]]; then
+        log_warn "Asset directory not found: $asset_dir"
+        return 0
+    fi
+    
+    # Ensure target directory exists
+    ensure_dir "$target_dir"
+    
+    # Copy platform-specific online setup scripts
+    case "$platform" in
+        windows-*)
+            # Windows platform: only copy .bat script
+            if [[ -f "$asset_dir/setup-node-online.bat" ]]; then
+                copy_files "$asset_dir/setup-node-online.bat" "$target_dir/setup-node-online.bat" "setup-node-online.bat"
+                chmod +x "$target_dir/setup-node-online.bat"
+                log_debug "Copied setup-node-online.bat for Windows"
+            fi
+            ;;
+        linux-*|macos-*)
+            # Linux/macOS platform: only copy .sh script
+            if [[ -f "$asset_dir/setup-node-online.sh" ]]; then
+                copy_files "$asset_dir/setup-node-online.sh" "$target_dir/setup-node-online.sh" "setup-node-online.sh"
+                chmod +x "$target_dir/setup-node-online.sh"
+                log_debug "Copied setup-node-online.sh for Linux/macOS"
+            fi
+            ;;
+        all|lite)
+            # Universal build or lite build without specific platform: copy both scripts
+            if [[ -f "$asset_dir/setup-node-online.sh" ]]; then
+                copy_files "$asset_dir/setup-node-online.sh" "$target_dir/setup-node-online.sh" "setup-node-online.sh"
+                chmod +x "$target_dir/setup-node-online.sh"
+                log_debug "Copied setup-node-online.sh"
+            fi
+            if [[ -f "$asset_dir/setup-node-online.bat" ]]; then
+                copy_files "$asset_dir/setup-node-online.bat" "$target_dir/setup-node-online.bat" "setup-node-online.bat"
+                chmod +x "$target_dir/setup-node-online.bat"
+                log_debug "Copied setup-node-online.bat"
+            fi
+            ;;
+        *)
+            log_warn "Unknown platform: $platform, skipping online asset files"
+            return 0
+            ;;
+    esac
+    
+    log_success "Online asset files copied to: $target_dir"
 }
 
 # Clean IDEA resources after build
@@ -787,6 +887,71 @@ build_idea_plugin() {
     clean_idea_resources_postbuild
 }
 
+# Build lite plugin (without builtin Node.js)
+build_lite_plugin() {
+    if [[ "$SKIP_IDEA_BUILD" == "true" ]]; then
+        log_info "Skipping IDEA lite plugin build"
+        return 0
+    fi
+
+    log_step "Building IDEA lite plugin (without builtin Node.js)..."
+
+    cd "$IDEA_BUILD_DIR"
+
+    # Check for Gradle build files
+    if [[ ! -f "build.gradle" && ! -f "build.gradle.kts" ]]; then
+        die "No Gradle build file found in IDEA directory"
+    fi
+
+    # Mark as lite build for other functions (must be set before calling prepare function)
+    LITE_BUILD=true
+
+    # Prepare online setup scripts for lite build
+    # This will detect LITE_BUILD=true and copy setup-node-online.sh/bat instead of downloading Node.js
+    prepare_builtin_nodejs_prebuild_for_platform "lite"
+
+    # Use gradlew if available, otherwise use system gradle
+    local gradle_cmd="gradle"
+    if [[ -f "./gradlew" ]]; then
+        gradle_cmd="./gradlew"
+        chmod +x "./gradlew"
+    fi
+
+    # Set debugMode based on BUILD_MODE
+    local debug_mode="none"
+    if [[ "$BUILD_MODE" == "$BUILD_MODE_RELEASE" ]]; then
+        debug_mode="release"
+        log_info "Building IDEA lite plugin in release mode (debugMode=release)"
+    elif [[ "$BUILD_MODE" == "$BUILD_MODE_DEBUG" ]]; then
+        debug_mode="idea"
+        log_info "Building IDEA lite plugin in debug mode (debugMode=idea)"
+    fi
+
+    # Set gradle properties for lite build
+    # Note: lite build doesn't use targetPlatform parameter since it's platform-agnostic
+    local gradle_props="-PdebugMode=$debug_mode -PtargetPlatform=lite"
+
+    # Build plugin with lite-specific properties
+    execute_cmd "$gradle_cmd $gradle_props buildPlugin --info" "IDEA lite plugin build"
+
+    # Find generated plugin
+    local plugin_file
+    plugin_file=$(find "$IDEA_BUILD_DIR/build/distributions" \( -name "*.zip" -o -name "*.jar" \) -type f | sort -r | head -n 1)
+
+    if [[ -n "$plugin_file" ]]; then
+        log_success "IDEA lite plugin built: $plugin_file"
+        export IDEA_LITE_PLUGIN_FILE="$plugin_file"
+    else
+        log_warn "IDEA lite plugin file not found in build/distributions"
+    fi
+
+    # Clean temporary resources after successful build
+    clean_idea_resources_postbuild
+
+    # Reset lite build flag
+    LITE_BUILD=false
+}
+
 # Clean build artifacts
 clean_build() {
     log_step "Cleaning build artifacts..."
@@ -813,11 +978,14 @@ clean_build() {
         [[ -d "$VSCODE_PLUGIN_TARGET_DIR" ]] && remove_dir "$VSCODE_PLUGIN_TARGET_DIR"
         # Clean builtin Node.js from resources directory
         [[ -d "$BUILTIN_NODEJS_DIR" ]] && remove_dir "$BUILTIN_NODEJS_DIR"
-        # Clean asset files from resources directory
+        # Clean asset files (setup scripts) from resources directory
+        # This includes both local and online setup scripts
         local scripts_resource_dir="$IDEA_BUILD_DIR/src/main/resources/scripts"
         if [[ -d "$scripts_resource_dir" ]]; then
             [[ -f "$scripts_resource_dir/setup-node.sh" ]] && remove_file "$scripts_resource_dir/setup-node.sh"
             [[ -f "$scripts_resource_dir/setup-node.bat" ]] && remove_file "$scripts_resource_dir/setup-node.bat"
+            [[ -f "$scripts_resource_dir/setup-node-online.sh" ]] && remove_file "$scripts_resource_dir/setup-node-online.sh"
+            [[ -f "$scripts_resource_dir/setup-node-online.bat" ]] && remove_file "$scripts_resource_dir/setup-node-online.bat"
             [[ -f "$scripts_resource_dir/NODE_SETUP_README.md" ]] && remove_file "$scripts_resource_dir/NODE_SETUP_README.md"
             # Remove directory if empty
             if [[ -z "$(ls -A "$scripts_resource_dir" 2>/dev/null)" ]]; then
@@ -871,6 +1039,12 @@ get_platform_identifier() {
         "linux-x64")
             echo "linux-x64"
             ;;
+        "macos-x64")
+            echo "macos-x64"
+            ;;
+        "macos-arm64")
+            echo "macos-arm64"
+            ;;
         *)
             echo "unknown"
             ;;
@@ -891,6 +1065,8 @@ get_plugin_name_with_platform() {
 }
 
 get_supported_platforms() {
+    # Only platforms with pre-built Node.js binaries for full plugin
+    # Lite plugin can support more platforms via online download
     echo "windows-x64 linux-x64"
 }
 

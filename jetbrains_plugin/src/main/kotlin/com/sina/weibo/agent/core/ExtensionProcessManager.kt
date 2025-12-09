@@ -100,40 +100,135 @@ class ExtensionProcessManager : Disposable {
             // Prepare Node.js executable path
             var nodePath = findNodeExecutable()
             if (nodePath == null) {
-                LOG.warn("Node.js not found, attempting to run setup script...")
+                LOG.warn("Node.js not found, attempting to setup...")
                 
-                // Show notification that we're attempting to install
-                NotificationUtil.showInfo(
-                    "Setting up Node.js",
-                    "没有找到 NodeJS. 正在安装 Nodejs $MIN_REQUIRED_NODE_VERSION..."
-                )
-                
-                // Try to run setup script
-                if (runNodeSetupScript()) {
-                    LOG.info("Setup script completed, retrying Node.js detection...")
-                    // Successfully installed
-                    NotificationUtil.showInfo(
-                        "Node.js setup completed",
-                        "NodeJS 安装成功"
-                    )
-                    // Retry finding Node.js after setup
-                    nodePath = findNodeExecutable()
+                // Check if online setup script exists (for lite plugin packages)
+                val onlineScriptName = when {
+                    SystemInfo.isWindows -> "setup-node-online.bat"
+                    SystemInfo.isMac || SystemInfo.isLinux -> "setup-node-online.sh"
+                    else -> null
                 }
                 
-                // If still not found, show error
-                if (nodePath == null) {
-                    LOG.error("Failed to find Node.js executable even after running setup script")
+                val onlineScriptPath = if (onlineScriptName != null) {
+                    PluginResourceUtil.getResourcePath(PLUGIN_ID, "scripts/$onlineScriptName")
+                } else {
+                    null
+                }
+                
+                // Check if this is a lite package (has online script) or full package (has offline script)
+                if (onlineScriptPath != null && File(onlineScriptPath).exists()) {
+                    // Lite package: use online installation
+                    LOG.info("Online setup script found, this is a lite package. Checking mirror connectivity...")
                     
-                    recordFailure(
-                        StartFailureReason.NODE_NOT_FOUND,
-                        "Failed to locate Node.js. Please install version $MIN_REQUIRED_NODE_VERSION or higher."
-                    )
-                    NotificationUtil.showError(
-                        "Node.js environment missing",
-                        "Failed to setup Node.js automatically. Please install Node.js manually and try again. Recommended version: $MIN_REQUIRED_NODE_VERSION or higher."
+                    // Show notification that we're checking network
+                    NotificationUtil.showInfo(
+                        "检查网络连接",
+                        "正在检测 Node.js 镜像源连通性..."
                     )
                     
-                    return false
+                    // Check mirror connectivity
+                    if (checkNodeMirrorConnectivity()) {
+                        LOG.info("Mirror is accessible, attempting online installation...")
+                        
+                        // Show notification that we're downloading
+                        NotificationUtil.showInfo(
+                            "下载 Node.js",
+                            "正在从镜像源下载 Node.js ${MIN_REQUIRED_NODE_VERSION.original}..."
+                        )
+                        
+                        // Try to run online setup script
+                        if (runNodeSetupOnlineScript()) {
+                            LOG.info("Online setup script completed, retrying Node.js detection...")
+                            
+                            // Successfully installed
+                            NotificationUtil.showInfo(
+                                "Node.js 安装成功",
+                                "Node.js ${MIN_REQUIRED_NODE_VERSION.original} 已成功安装"
+                            )
+                            
+                            // Retry finding Node.js after setup
+                            nodePath = findNodeExecutable()
+                            
+                            // If still not found, show error
+                            if (nodePath == null) {
+                                LOG.error("Failed to find Node.js executable even after online setup")
+                                
+                                recordFailure(
+                                    StartFailureReason.NODE_NOT_FOUND,
+                                    "Node.js not found after online installation."
+                                )
+                                NotificationUtil.showError(
+                                    "Node.js 安装后未找到",
+                                    "Node.js 安装完成但无法找到可执行文件，请手动安装 Node.js ${MIN_REQUIRED_NODE_VERSION.original} 或更高版本。"
+                                )
+                                
+                                return false
+                            }
+                        } else {
+                            LOG.error("Online setup script failed")
+                            
+                            recordFailure(
+                                StartFailureReason.NODE_SETUP_FAILED,
+                                "Failed to download and install Node.js from mirror."
+                            )
+                            NotificationUtil.showError(
+                                "Node.js 下载失败",
+                                "无法从镜像源下载 Node.js，请手动安装 Node.js ${MIN_REQUIRED_NODE_VERSION.original} 或更高版本。"
+                            )
+                            
+                            return false
+                        }
+                    } else {
+                        LOG.warn("Mirror is not accessible, cannot perform online installation")
+                        
+                        recordFailure(
+                            StartFailureReason.NODE_NOT_FOUND,
+                            "Node.js mirror is not accessible and Node.js is not installed."
+                        )
+                        NotificationUtil.showError(
+                            "网络不可用",
+                            "无法连接到 Node.js 镜像源，且本地未安装 Node.js。请检查网络连接或手动安装 Node.js ${MIN_REQUIRED_NODE_VERSION.original} 或更高版本。"
+                        )
+                        
+                        return false
+                    }
+                } else {
+                    // Full package: use existing offline installation logic
+                    LOG.warn("Online setup script not found, using offline setup (full package)...")
+                    
+                    // Show notification that we're attempting to install
+                    NotificationUtil.showInfo(
+                        "安装 Node.js",
+                        "没有找到 NodeJS. 正在安装 Nodejs ${MIN_REQUIRED_NODE_VERSION.original}..."
+                    )
+                    
+                    // Try to run offline setup script
+                    if (runNodeSetupScript()) {
+                        LOG.info("Setup script completed, retrying Node.js detection...")
+                        // Successfully installed
+                        NotificationUtil.showInfo(
+                            "Node.js setup completed",
+                            "NodeJS 安装成功"
+                        )
+                        // Retry finding Node.js after setup
+                        nodePath = findNodeExecutable()
+                    }
+                    
+                    // If still not found, show error
+                    if (nodePath == null) {
+                        LOG.error("Failed to find Node.js executable even after running setup script")
+                        
+                        recordFailure(
+                            StartFailureReason.NODE_NOT_FOUND,
+                            "Failed to locate Node.js. Please install version $MIN_REQUIRED_NODE_VERSION or higher."
+                        )
+                        NotificationUtil.showError(
+                            "Node.js environment missing",
+                            "Failed to setup Node.js automatically. Please install Node.js manually and try again. Recommended version: $MIN_REQUIRED_NODE_VERSION or higher."
+                        )
+                        
+                        return false
+                    }
                 }
             }
             
@@ -534,6 +629,124 @@ class ExtensionProcessManager : Disposable {
             }
         } catch (e: Exception) {
             LOG.error("Failed to run Node.js setup script", e)
+            return false
+        }
+    }
+    
+    /**
+     * Check if Node.js mirror is accessible via HTTP HEAD request
+     * @return true if mirror is accessible, false otherwise
+     */
+    private fun checkNodeMirrorConnectivity(): Boolean {
+        val mirrorUrl = "https://registry.npmmirror.com/-/binary/node/v${MIN_REQUIRED_NODE_VERSION.original}/"
+        
+        try {
+            LOG.info("Checking Node.js mirror connectivity: $mirrorUrl")
+            
+            val url = java.net.URL(mirrorUrl)
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            
+            // Apply proxy configuration
+            try {
+                val proxyConfig = ProxyConfigUtil.getProxyEnvVarsForProcessStart()
+                if (proxyConfig.containsKey("http_proxy") || proxyConfig.containsKey("https_proxy")) {
+                    LOG.info("Using proxy configuration for connectivity check")
+                }
+            } catch (e: Exception) {
+                LOG.warn("Failed to apply proxy configuration", e)
+            }
+            
+            connection.requestMethod = "HEAD"
+            connection.connectTimeout = 3000 // 3 seconds
+            connection.readTimeout = 5000    // 5 seconds
+            connection.instanceFollowRedirects = true
+            
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            
+            val isAccessible = responseCode in 200..399
+            LOG.info("Mirror connectivity check result: $responseCode, accessible: $isAccessible")
+            
+            return isAccessible
+        } catch (e: java.net.SocketTimeoutException) {
+            LOG.warn("Mirror connectivity check timeout", e)
+            return false
+        } catch (e: Exception) {
+            LOG.warn("Mirror connectivity check failed", e)
+            return false
+        }
+    }
+    
+    /**
+     * Run Node.js online setup script to download and install Node.js
+     * @return true if script executed successfully, false otherwise
+     */
+    private fun runNodeSetupOnlineScript(): Boolean {
+        try {
+            // Determine script name based on OS
+            val scriptName = when {
+                SystemInfo.isWindows -> "setup-node-online.bat"
+                SystemInfo.isMac || SystemInfo.isLinux -> "setup-node-online.sh"
+                else -> {
+                    LOG.error("Unsupported operating system for Node.js online setup")
+                    return false
+                }
+            }
+            
+            // Get script path from plugin resources
+            val scriptPath = PluginResourceUtil.getResourcePath(PLUGIN_ID, "scripts/$scriptName")
+            if (scriptPath == null) {
+                LOG.error("Online setup script not found in plugin resources: scripts/$scriptName")
+                return false
+            }
+            
+            val scriptFile = File(scriptPath)
+            if (!scriptFile.exists()) {
+                LOG.error("Online setup script file does not exist: $scriptPath")
+                return false
+            }
+            
+            // Make script executable on Unix-like systems
+            if (!SystemInfo.isWindows) {
+                scriptFile.setExecutable(true, false)
+            }
+            
+            LOG.info("Running Node.js online setup script: $scriptPath")
+            
+            // Build command based on OS
+            val command = if (SystemInfo.isWindows) {
+                listOf("cmd.exe", "/c", scriptPath)
+            } else {
+                listOf("/bin/bash", scriptPath)
+            }
+            
+            // Execute script
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.directory(scriptFile.parentFile)
+            processBuilder.redirectErrorStream(true)
+            
+            val process = processBuilder.start()
+            
+            // Read and log output
+            val reader = process.inputStream.bufferedReader()
+            reader.useLines { lines ->
+                lines.forEach { line ->
+                    LOG.info("[Online Setup Script] $line")
+                }
+            }
+            
+            // Wait for script to complete
+            val exitCode = process.waitFor()
+            
+            if (exitCode == 0) {
+                LOG.info("Node.js online setup script completed successfully")
+                return true
+            } else {
+                LOG.error("Node.js online setup script failed with exit code: $exitCode")
+                return false
+            }
+        } catch (e: Exception) {
+            LOG.error("Failed to run Node.js online setup script", e)
             return false
         }
     }
