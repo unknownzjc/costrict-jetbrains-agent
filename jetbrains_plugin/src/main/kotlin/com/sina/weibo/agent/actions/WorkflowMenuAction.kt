@@ -106,18 +106,18 @@ class WorkflowMenuAction(
                     }
                     popup.add(runAllAction)
                     
-                    val generateTestsAction = JMenuItem("生成测试用例")
-                    generateTestsAction.addActionListener {
-                        try {
-                            val newAction = GenerateTestsAction()
-                            val newEvent = createActionEvent(e, project, editor)
-                            newAction.actionPerformed(newEvent)
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
-                        }
-                    }
-                    popup.add(generateTestsAction)
+                    // val generateTestsAction = JMenuItem("生成测试用例")
+                    // generateTestsAction.addActionListener {
+                    //     try {
+                    //         val newAction = GenerateTestsAction()
+                    //         val newEvent = createActionEvent(e, project, editor)
+                    //         newAction.actionPerformed(newEvent)
+                    //     } catch (ex: Exception) {
+                    //         ex.printStackTrace()
+                    //         println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
+                    //     }
+                    // }
+                    // popup.add(generateTestsAction)
                 }
             }
             TaskStatus.IN_PROGRESS -> {
@@ -141,18 +141,18 @@ class WorkflowMenuAction(
                     }
                     popup.add(runAllAction)
                     
-                     val generateTestsAction = JMenuItem("生成测试用例")
-                    generateTestsAction.addActionListener {
-                        try {
-                            val newAction = GenerateTestsAction()
-                            val newEvent = createActionEvent(e, project, editor)
-                            newAction.actionPerformed(newEvent)
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
-                        }
-                    }
-                    popup.add(generateTestsAction)
+                    // val generateTestsAction = JMenuItem("生成测试用例")
+                    // generateTestsAction.addActionListener {
+                    //     try {
+                    //         val newAction = GenerateTestsAction()
+                    //         val newEvent = createActionEvent(e, project, editor)
+                    //         newAction.actionPerformed(newEvent)
+                    //     } catch (ex: Exception) {
+                    //         ex.printStackTrace()
+                    //         println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
+                    //     }
+                    // }
+                    // popup.add(generateTestsAction)
                 } else {
                      val retryAction = JMenuItem("重试")
                      retryAction.addActionListener {
@@ -310,19 +310,19 @@ class WorkflowMenuAction(
                     }
                     popup.add(runAllAction)
                     
-                    val generateTestsAction = JMenuItem("生成测试用例")
-                    generateTestsAction.addActionListener {
-                        try {
-                            println("WorkflowMenuAction: 生成测试用例按钮被点击")
-                            val newAction = GenerateTestsAction()
-                            val newEvent = createActionEvent(e, project, editor)
-                            newAction.actionPerformed(newEvent)
-                        } catch (ex: Exception) {
-                            ex.printStackTrace()
-                            println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
-                        }
-                    }
-                    popup.add(generateTestsAction)
+                    // val generateTestsAction = JMenuItem("生成测试用例")
+                    // generateTestsAction.addActionListener {
+                    //     try {
+                    //         println("WorkflowMenuAction: 生成测试用例按钮被点击")
+                    //         val newAction = GenerateTestsAction()
+                    //         val newEvent = createActionEvent(e, project, editor)
+                    //         newAction.actionPerformed(newEvent)
+                    //     } catch (ex: Exception) {
+                    //         ex.printStackTrace()
+                    //         println("WorkflowMenuAction: 生成测试用例失败 - ${ex.message}")
+                    //     }
+                    // }
+                    // popup.add(generateTestsAction)
                 }
             }
         }

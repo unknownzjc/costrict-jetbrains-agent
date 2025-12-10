@@ -24,7 +24,7 @@ import { ExtensionManager } from './extensionManager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const LOGS_DIR = path.join(os.homedir(), '.run-vs-agent', 'logs');
+const LOGS_DIR = path.join(os.homedir(), '.costrict-jetbrains', 'logs');
 
 function ensureLogsDirectory(): void {
     try {
