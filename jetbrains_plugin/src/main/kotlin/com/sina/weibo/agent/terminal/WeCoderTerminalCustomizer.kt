@@ -277,7 +277,7 @@ class WeCoderTerminalCustomizer : LocalTerminalCustomizer() {
   
   private fun getVSCodeScript(shellName: String): String? {
     return when (shellName) {
-      "bash", "sh" -> {
+      "bash.exe", "bash", "sh" -> {
         // bash uses --rcfile parameter, needs to point to a specific file
         Paths.get(shellIntegrationBaseDir, "vscode-bash", "bashrc").toString()
       }
