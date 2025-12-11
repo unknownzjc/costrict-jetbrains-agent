@@ -26,6 +26,8 @@ SKIP_TESTS=false
 OUTPUT_DIR=""
 BUILD_PLATFORM="all"
 COSTRICT_VERSION=""
+LITE_BUILD=false
+FULL_BUILD=false
 
 # Show help for this script
 show_help() {
@@ -51,7 +53,9 @@ OPTIONS:
     -m, --mode MODE       Build mode: release (default) or debug
     -c, --clean           Clean before building
     -o, --output DIR      Output directory for build artifacts
-    -p, --platform PLATFORM   Build platform: all (default), windows, linux
+    -p, --platform PLATFORM   Build platform for full build: all (default), windows, linux
+                              Note: Full build only supports Windows and Linux
+                              Use --lite for cross-platform support (including macOS)
     -t, --skip-tests      Skip running tests
     --costrict-version VERSION   CoStrict version to build (branch, tag, or commit)
     --vsix FILE           Use existing VSIX file (skip VSCode build)
@@ -59,6 +63,8 @@ OPTIONS:
     --skip-base           Skip base extension build
     --skip-idea           Skip IDEA plugin build
     --skip-nodejs         Skip Node.js preparation
+    --lite                Build lite plugin only (without builtin Node.js, cross-platform)
+    --full                Build full plugins only (with builtin Node.js, Windows/Linux only)
     -v, --verbose         Enable verbose output
     -n, --dry-run         Show what would be done without executing
     -h, --help            Show this help message
@@ -68,9 +74,11 @@ BUILD MODES:
     debug       Development build with debug symbols and resources
 
 EXAMPLES:
-    $SCRIPT_NAME                           # Build all components for all platforms
-    $SCRIPT_NAME --platform windows        # Build only for Windows platform
-    $SCRIPT_NAME --platform linux          # Build only for Linux platform
+    $SCRIPT_NAME                           # Build all: full (Win+Linux) + lite (cross-platform)
+    $SCRIPT_NAME --platform windows        # Build full plugin for Windows only
+    $SCRIPT_NAME --platform linux          # Build full plugin for Linux only
+    $SCRIPT_NAME --lite                    # Build lite plugin only (supports macOS)
+    $SCRIPT_NAME --full                    # Build full plugins only (Windows + Linux)
     $SCRIPT_NAME --mode debug              # Debug build
     $SCRIPT_NAME --clean vscode            # Clean build VSCode only
     $SCRIPT_NAME --vsix path/to/file.vsix  # Use existing VSIX
@@ -166,6 +174,16 @@ parse_build_args() {
                 SKIP_NODEJS_PREPARE=true
                 shift
                 ;;
+            --lite)
+                LITE_BUILD=true
+                FULL_BUILD=false
+                shift
+                ;;
+            --full)
+                FULL_BUILD=true
+                LITE_BUILD=false
+                shift
+                ;;
             -v|--verbose)
                 VERBOSE=true
                 shift
@@ -220,12 +238,15 @@ parse_build_args() {
         "linux")
             BUILD_PLATFORM="linux-x64"
             ;;
-        "windows-x64"|"linux-x64")
+        "macos")
+            BUILD_PLATFORM="macos-x64"
+            ;;
+        "windows-x64"|"linux-x64"|"macos-x64"|"macos-arm64")
             # Already in correct format
             ;;
         *)
             log_error "Invalid build platform: $BUILD_PLATFORM"
-            log_info "Valid platforms: all, windows, linux"
+            log_info "Valid platforms: all, windows, linux, macos"
             exit 3
             ;;
     esac
@@ -412,6 +433,13 @@ build_idea_component() {
         return 0
     fi
 
+    # Handle lite/full build flags
+    if [[ "$LITE_BUILD" == "true" ]]; then
+        build_lite_plugin
+        log_success "IDEA lite plugin build completed"
+        return 0
+    fi
+    
     if [[ "$BUILD_PLATFORM" == "all" ]]; then
         log_step "Building IDEA plugin for all platforms..."
         local supported_platforms=$(get_supported_platforms)
@@ -519,7 +547,11 @@ show_build_summary() {
     fi
 
     # Show IDEA plugins (single or multiple platforms)
-    if [[ "$BUILD_PLATFORM" == "all" && -n "${MULTI_PLATFORM_BUILT_FILES:-}" ]]; then
+    if [[ "$LITE_BUILD" == "true" ]]; then
+        if [[ -n "${IDEA_LITE_PLUGIN_FILE:-}" && -f "$IDEA_LITE_PLUGIN_FILE" ]]; then
+            log_info "  IDEA Lite Plugin: $IDEA_LITE_PLUGIN_FILE"
+        fi
+    elif [[ "$BUILD_PLATFORM" == "all" && -n "${MULTI_PLATFORM_BUILT_FILES:-}" ]]; then
         log_info "  IDEA Plugins (platform-specific):"
         for plugin_file in $MULTI_PLATFORM_BUILT_FILES; do
             if [[ -f "$plugin_file" ]]; then
@@ -528,6 +560,11 @@ show_build_summary() {
         done
     elif [[ -n "${IDEA_PLUGIN_FILE:-}" && -f "$IDEA_PLUGIN_FILE" ]]; then
         log_info "  IDEA Plugin: $IDEA_PLUGIN_FILE"
+    fi
+    
+    # Show lite plugin if built alongside full plugins (default behavior)
+    if [[ "$LITE_BUILD" == "false" && "$FULL_BUILD" == "false" && -n "${IDEA_LITE_PLUGIN_FILE:-}" && -f "$IDEA_LITE_PLUGIN_FILE" ]]; then
+        log_info "  IDEA Lite Plugin: $IDEA_LITE_PLUGIN_FILE"
     fi
 
     # Show debug resources
@@ -581,6 +618,15 @@ main() {
     [[ -n "$OUTPUT_DIR" ]] && log_info "  Output: $OUTPUT_DIR"
     [[ -n "$COSTRICT_VERSION" ]] && log_info "  CoStrict version: $COSTRICT_VERSION"
     
+    # Show build type
+    if [[ "$LITE_BUILD" == "true" ]]; then
+        log_info "  Build type: Lite only (without builtin Node.js)"
+    elif [[ "$FULL_BUILD" == "true" ]]; then
+        log_info "  Build type: Full only (with builtin Node.js)"
+    else
+        log_info "  Build type: Both full and lite (default)"
+    fi
+    
     # Initialize build environment
     init_build_env
     
@@ -592,7 +638,30 @@ main() {
     # Build components
     build_vscode_plugin_component
     build_vscode_extension_host_component
-    build_idea_component
+    
+    # Handle lite/full build flags
+    if [[ "$LITE_BUILD" == "false" && "$FULL_BUILD" == "false" ]]; then
+        # Default behavior: build both full and lite plugins
+        log_info "Building both full and lite plugins (default behavior)..."
+        
+        # Build full plugins
+        build_idea_component
+        
+        # Reset skip flags for lite build
+        local original_skip_idea="$SKIP_IDEA_BUILD"
+        SKIP_IDEA_BUILD=false
+        
+        # Build lite plugin
+        LITE_BUILD=true
+        build_idea_component
+        LITE_BUILD=false
+        
+        # Restore original skip flag
+        SKIP_IDEA_BUILD="$original_skip_idea"
+    else
+        # Build based on specific flag
+        build_idea_component
+    fi
     
     # Run tests and finalize
     #run_tests
