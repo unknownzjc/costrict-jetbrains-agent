@@ -13,6 +13,7 @@ plugins {
     id("org.jetbrains.intellij") version "1.13.3"
     id("org.jlleitschuh.gradle.ktlint") version "11.6.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.4"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 apply(from = "genPlatform.gradle")
@@ -293,6 +294,10 @@ tasks {
         // Wire task inputs for build cache/key stability
         inputs.property("build_mode", debugModeProp)
         inputs.property("vscode_plugin", vscodePluginProp)
+        
+        // Depend on shadowJar to ensure relocated classes are ready
+        dependsOn(shadowJar)
+        
         prepareSandbox()
     }
 
@@ -313,6 +318,13 @@ tasks {
         version.set(pluginVersion)
         sinceBuild.set(properties("pluginSinceBuild"))
         untilBuild.set("")
+    }
+
+    runPluginVerifier {
+        // 指定要验证的 IDE 版本（使用实际存在的版本）
+        ideVersions.set(listOf(
+            "IC-2023.3",    // 与 platformVersion 一致
+        ))
     }
 
     signPlugin {
@@ -338,6 +350,68 @@ tasks {
 
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
+    }
+
+    // Configure shadowJar to relocate packages
+    // Shadow should process the instrumented jar output
+    shadowJar {
+        relocate("com.sina.weibo.agent", "ai.costrict")
+        // Use empty classifier so it replaces the non-instrumented jar
+        archiveClassifier.set("")
+        // Exclude META-INF signature files
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    }
+    
+    // Regular jar is needed for the instrumentation process
+    jar {
+        enabled = true
+    }
+    
+    // After creating instrumented jar, apply relocation to it using a custom task
+    register<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("relocateInstrumentedJar") {
+        dependsOn(instrumentedJar)
+        
+        // Configure inputs/outputs lazily
+        from(provider { zipTree(instrumentedJar.get().archiveFile) })
+        
+        // Apply the same relocation
+        relocate("com.sina.weibo.agent", "ai.costrict")
+        // Output with a temporary classifier
+        archiveClassifier.set("instrumented-relocated")
+        archiveBaseName.set(project.name)
+        archiveVersion.set(pluginVersion)
+        // Exclude META-INF signature files
+        exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+        
+        // After creating the relocated jar, replace the original instrumented jar
+        doLast {
+            val relocatedJar = archiveFile.get().asFile
+            val instrumentedJarFile = instrumentedJar.get().archiveFile.get().asFile
+            
+            if (instrumentedJarFile.exists()) {
+                instrumentedJarFile.delete()
+            }
+            relocatedJar.renameTo(instrumentedJarFile)
+            
+            println("Replaced ${instrumentedJarFile.name} with relocated version")
+        }
+    }
+    
+    // Make prepareSandbox use our relocated instrumented jar
+    prepareSandbox {
+        dependsOn("relocateInstrumentedJar")
+    }
+    
+    // Also delete the non-instrumented shadowJar before packaging
+    buildPlugin {
+        dependsOn("relocateInstrumentedJar")
+        doFirst {
+            // Delete the non-instrumented shadowJar to avoid duplicates
+            val shadowJarFile = shadowJar.get().archiveFile.get().asFile
+            if (shadowJarFile.exists()) {
+                shadowJarFile.delete()
+            }
+        }
     }
 }
 
