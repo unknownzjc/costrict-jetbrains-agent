@@ -16,7 +16,12 @@ object EnvWhitelist {
         "PYENV_",
         "SDKMAN_",
         "CONDA_",
+        "BUN_",
         "CARGO_",
+        "VSCODE_",
+        "GIT_",
+        "GEMINI_CLI_",
+        "ZGSM_",
         "RUST_"
     )
 

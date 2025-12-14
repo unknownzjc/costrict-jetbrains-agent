@@ -508,10 +508,7 @@ style:
     active: false
   CollapsibleIfStatements:
     active: false
-  DataClassContainsFunction:
-    active: false
-    conversionFunctionPrefix:
-      - 'to'
+  # DataClassContainsFunction has been removed
   DataClassShouldBeImmutable:
     active: false
   DestructuringDeclarationWithTooManyEntries:
@@ -531,12 +528,14 @@ style:
     includeLineWrapping: false
   ForbiddenComment:
     active: true
-    values:
-      - 'FIXME:'
-      - 'STOPSHIP:'
-      - 'TODO:'
+    comments:
+      - value: 'FIXME:'
+        reason: 'Fix this before commit'
+      - value: 'STOPSHIP:'
+        reason: 'This should not be shipped'
+      - value: 'TODO:'
+        reason: 'Pending work to be done'
     allowedPatterns: ''
-    customMessage: ''
   ForbiddenImport:
     active: false
     imports: []
@@ -546,12 +545,7 @@ style:
     methods:
       - 'kotlin.io.print'
       - 'kotlin.io.println'
-  ForbiddenPublicDataClass:
-    active: true
-    excludes: ['**']
-    ignorePackages:
-      - '*.internal'
-      - '*.internal.*'
+  # ForbiddenPublicDataClass has been moved to libraries ruleset
   ForbiddenVoid:
     active: true
     ignoreOverridden: false
@@ -561,12 +555,8 @@ style:
     ignoreOverridableFunction: true
     ignoreActualFunction: true
     excludedFunctions: []
-  LibraryCodeMustSpecifyReturnType:
-    active: true
-    excludes: ['**']
-  LibraryEntitiesShouldNotBePublic:
-    active: false
-    excludes: ['**']
+  # LibraryCodeMustSpecifyReturnType has been moved to libraries ruleset
+  # LibraryEntitiesShouldNotBePublic has been moved to libraries ruleset
   LoopWithTooManyJumpStatements:
     active: true
     maxJumpCount: 1
@@ -588,7 +578,8 @@ style:
     ignoreEnums: false
     ignoreRanges: false
     ignoreExtensionFunctions: true
-  MandatoryBracesIfStatements:
+  # MandatoryBracesIfStatements has been replaced with BracesOnIfStatements
+  BracesOnIfStatements:
     active: false
   MandatoryBracesLoops:
     active: false
