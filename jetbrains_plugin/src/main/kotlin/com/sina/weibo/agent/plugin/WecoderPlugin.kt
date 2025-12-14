@@ -33,7 +33,7 @@ import com.sina.weibo.agent.extensions.core.ExtensionManager
 import com.sina.weibo.agent.util.ExtensionUtils
 import com.sina.weibo.agent.util.PluginConstants
 import com.sina.weibo.agent.util.PluginResourceUtil
-import com.sina.weibo.agent.plugin.EnvSnapshotWriter
+import com.sina.weibo.agent.env.EnvSnapshotWriter
 import java.io.File
 
 /**
