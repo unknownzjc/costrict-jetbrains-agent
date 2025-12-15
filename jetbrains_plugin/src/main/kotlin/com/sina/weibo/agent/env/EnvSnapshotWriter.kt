@@ -9,21 +9,50 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.pathString
+import kotlin.io.path.readText
 
 object EnvSnapshotWriter {
 
     private val LOG = Logger.getInstance(EnvSnapshotWriter::class.java)
     private const val SNAPSHOT_FILE = "idea-shell-env.json"
+    private const val UPDATE_TIME_KEY = "__UPDATE_TIME__"
+    private val MIN_REFRESH_INTERVAL_MINUTES = 5L
 
     fun ensureSnapshot() {
         try {
             val snapshotPath = resolveSnapshotPath()
+            
+            // 检查文件是否存在且更新时间是否超过5分钟
             if (snapshotPath.exists()) {
-                LOG.info("Env snapshot already exists: ${snapshotPath.pathString}")
-                return
+                val content = snapshotPath.readText()
+                if (content.isNotEmpty()) {
+                    val env = parseJson(content)
+                    val updateTimeStr = env[UPDATE_TIME_KEY]
+                    
+                    if (updateTimeStr != null) {
+                        try {
+                            val updateTime = Instant.parse(updateTimeStr)
+                            val now = Instant.now()
+                            val minutesSinceUpdate = ChronoUnit.MINUTES.between(updateTime, now)
+                            
+                            if (minutesSinceUpdate < MIN_REFRESH_INTERVAL_MINUTES) {
+                                LOG.info("Env snapshot is recent (${minutesSinceUpdate} minutes ago), skipping refresh: ${snapshotPath.pathString}")
+                                return
+                            } else {
+                                LOG.info("Env snapshot is outdated (${minutesSinceUpdate} minutes ago), refreshing: ${snapshotPath.pathString}")
+                            }
+                        } catch (e: Exception) {
+                            LOG.warn("Failed to parse update time from snapshot, will refresh: ${e.message}")
+                        }
+                    } else {
+                        LOG.info("Env snapshot missing update time, will refresh: ${snapshotPath.pathString}")
+                    }
+                }
             }
 
             val shell = detectShell()
@@ -35,6 +64,7 @@ object EnvSnapshotWriter {
             }
 
             env["__JETBRAINS_EMBEDDED__"] = "true"
+            env[UPDATE_TIME_KEY] = Instant.now().toString()
 
             writeJson(snapshotPath.toFile(), env)
 
@@ -118,6 +148,32 @@ object EnvSnapshotWriter {
                     map[key] = value
                 }
 
+        return map
+    }
+
+    private fun parseJson(content: String): MutableMap<String, String> {
+        val map = mutableMapOf<String, String>()
+        
+        try {
+            // 简单的JSON解析，假设格式为 {"key1":"value1","key2":"value2"}
+            val trimmed = content.trim()
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                val inner = trimmed.substring(1, trimmed.length - 1)
+                val pairs = inner.split(",")
+                
+                for (pair in pairs) {
+                    val keyValue = pair.split(":", limit = 2)
+                    if (keyValue.size == 2) {
+                        val key = keyValue[0].trim().removeSurrounding("\"")
+                        val value = keyValue[1].trim().removeSurrounding("\"")
+                        map[key] = value
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            LOG.warn("Failed to parse JSON content: ${e.message}")
+        }
+        
         return map
     }
 
