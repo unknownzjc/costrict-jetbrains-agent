@@ -20,14 +20,33 @@ SPDX-License-Identifier: Apache-2.0
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
     <description><![CDATA[
-        <h1>CoStrict - Run VSCode-based Coding Agents in JetBrains IDEs</h1>
-        <p>CoStrict is an innovative cross-platform development tool that enables developers to run VSCode-based coding agents and extensions within JetBrains IDEs (IntelliJ IDEA, WebStorm, PyCharm, etc.) or other IDE platforms.</p>
+        <h1>CoStrict (prev. Shenma)</h1>
+        <h2>Strict AI coder for enterprises</h2>
+        <p>CoStrict is a <strong>free, open-source AI-assisted programming tool</strong> that supports private deployment for enterprises, making it the optimal choice for enterprise serious programming. Its core capabilities are outstanding: <strong>Strict Mode，Code Review</strong> , Code Completion, etc. Feature highlights include: enterprise-level business understanding, standardized AI development processes, Vibe Mode, MCP service, multiple advanced free models, API/model customization, mode selection/customization, image context capabilities, and more. It supports multiple mainstream IDEs and leads the way in supporting VS Code and JetBrains IDEs. Compatible with popular languages including Python, Go, Java, JavaScript/ TypeScript, and C/C++."</p>
         
-        <h2>Core Features</h2>
+        <h2>Features</h2>
         <ul>
-            <li><strong>VSCode Agent Compatibility</strong>: Seamlessly run VSCode-based coding agents in JetBrains IDEs</li>
-            <li><strong>Cross-IDE Development</strong>: Unified agent experience across different IDE platforms</li>
-            <li><strong>AI-Powered Assistance</strong>: Leverage advanced AI coding assistants for intelligent code generation</li>
+            <li><strong>Strict Mode</strong>:<br>
+                Strict Mode standardizes the process of AI-generated code, making it more aligned with enterprise development scenarios. It systematically breaks down a single requirement into steps such as：Requirements Analysis, Architecture Design, Task Planning and Test Generation etc. acting as a standardized procedure for AI to ensure high-quality and highly controllable output.
+            </li>
+            <li><strong>Code Review</strong>: <br>
+                Code Review enables indexing and parsing of entire code repositories, implementing company-wide RAG (Retrieval-Augmented Generation) for coding knowledge.
+It adopts the strategy of "specialized checks by a multi-expert model" + "cross-confirmation by multiple models."
+It supports users in conducting code checks on functions, selected code lines, code files, and entire project files.
+            </li>
+            <li><strong>More features</strong>: <br>
+                <ul>
+                    <li><strong>Code Completion:</strong> Automatically generates subsequent code based on the cursor's context code, quickly outputs code in seconds</li>
+                    <li><strong>Vibe Code:</strong> Vibe Code is designed for rapid development and simple tasks. It supports multi-turn natural language dialogue, allowing for real-time refinement and precise code generation.</li>
+                    <li><strong>MCP Service:</strong> Seamlessly integrates with the MCP open ecosystem to enable standardized system connectivity. You can Integrate external APIs、Connect to databases、Develop custom tools through MCP services.</li>
+                    <li><strong>APIs & Model Customization:</strong> Officially provided are multiple free advanced models like claude-sonnet-4; it also supports using third-party API providers such as Anthropic, OpenAI, etc.; you can also configure any API compatible with OpenAl; or use local models through I M Studio/Ollama</li>
+                    <li><strong>Mode Customization:</strong> We provide various default modes to adapt to different scenarios, such as the Code mode with outstanding coding capabilities and the Orchestrator mode skilled in complex task decomposition. You can also customize mode according to your needs.</li>
+                    <li><strong>Context:</strong> Shenma will automatically incorporate all repository data of large files into the context, and for code completion scenarios, it will also dynamically perceive the context based on the cursor position. You can also add files/folders, terminals, issues, etc. using the @ key to provide more precise context information for the input.</li>
+                    <li><strong>Image:</strong> You can click the image icon below the dialog box to upload an image, or you can hold down the Shift key to drag and drop the image into the input box.</li>
+                    <li><strong>Multi-language Support:</strong> Supports mainstream programming languages: Python, Go, Java, JavaScript, TypeScript, C/C++ and all other programming languages</li>
+                    <li><strong>Privacy & Security:</strong> To ensure data security and provide better service at a lower cost, we offer a professional and comprehensive private deployment solution, ensuring code security through physical isolation and end-to-end encryption.</li>
+                </ul>
+            </li>
         </ul>
         
         <h2>Supported IDEs</h2>
@@ -45,53 +64,34 @@ SPDX-License-Identifier: Apache-2.0
             <li><strong>Android Studio</strong> - Android development</li>
         </ul>
         
-        <h2>Supported Agents</h2>
-        <ul>
-            <li><strong>Roo Code</strong>: Advanced AI-powered coding assistant with intelligent code generation and refactoring capabilities</li>
-            <li><strong>Custom Extensions</strong>: Support for custom AI coding assistants</li>
-        </ul>
         
         <h2>Requirements</h2>
         <ul>
             <li>Requires <a href="https://nodejs.org/">Node.js</a> v18+ installed</li>
             <li>Requires JetBrains IDE version 2023.1 or later for optimal compatibility</li>
         </ul>
-        
-        <h2>Benefits</h2>
-        <ul>
-            <li><strong>Increased Productivity</strong>: Access powerful AI coding assistants without leaving your preferred IDE</li>
-            <li><strong>Unified Workflow</strong>: Maintain a consistent development experience across different platforms</li>
-            <li><strong>Extensible Architecture</strong>: Support for new agents and extensions as they become available</li>
-        </ul>
-        
    ]]></description>
    
    <!-- Change notes for the plugin -->
    <change-notes><![CDATA[
-       <h3>Version 0.2.5</h3>
+       <h3>Version 2.0.27</h3>
         <ul>
-            <li>fix incompatible error with IntelliJ IDEA Ultimate IU-253.27864.23</li>
+            <li>Add tool result ID validation and fix mechanism to prevent ID mismatch issues in API requests</li>
+            <li>Enhance maxTokens handling in ZgsmAiHandler and SettingsView components</li>
+            <li>Improve code review event handling to prevent duplicate completions</li>
+            <li>Optimize code review mode handling using reset functions for task completion and error states</li>
+            <li>Enhance task error handling by including request IDs in streaming failure messages</li>
+            <li>Add /dotest shortcut command and update mode configuration</li>
+            <li>Reduce maximum non-busy terminal count from 5 to 3</li>
+            <li>Fix disable handling logic in reasoning budget component</li>
+            <li>Unify webview panel identifiers using consistent tabPanelId</li>
+            <li>Add minimum and medium reasoning effort levels for Gemini</li>
+            <li>Filter out non-Anthropic content blocks sent to Vertex API</li>
+            <li>Fix test cases in terminal registry to adapt to new terminal limits</li>
+            <li>Add rehype-sanitize and markdown error handling</li>
+            <li>Sync roocode <a href="https://github.com/zgsm-ai/costrict/commit/f97b5155ac16290865af3016e2b7512e4bc9a389">last commit</a></li>
+            <li>Fix known issues</li>
         </ul>
-        <h3>Version 0.2.4</h3>
-        <ul>
-            <li>Fix Cline theme</li>
-        </ul>
-        <h3>Version 0.2.2</h3>
-        <ul>
-            <li>Support Kilo Code</li>
-        </ul>
-        <h3>Version 0.2.1</h3>
-        <ul>
-            <li>Introduce specific context menus and operations for extension</li>
-            <li>Update roo-code version</li>
-        </ul>
-        <h3>Version 0.2.0</h3>
-        <ul>
-            <li>Support the Cline plugin and allow switching between multiple plugins.</li>
-            <li>Important: The storage path has changed in the new version. Therefore, before upgrading, please use Roo Code’s Export Settings feature to back up your settings.</li>
-        </ul>
-
-
    ]]></change-notes>
 
     <!-- Product and plugin compatibility requirements.
