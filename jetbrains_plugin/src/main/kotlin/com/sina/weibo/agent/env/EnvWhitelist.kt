@@ -26,6 +26,9 @@ object EnvWhitelist {
         "JETBRAINS_",
         "GEMINI_",
         "LC_",
+        "PNPM_",
+        "RUBY_",
+        "ELECTRON_",
         "RUST_"
     )
 
