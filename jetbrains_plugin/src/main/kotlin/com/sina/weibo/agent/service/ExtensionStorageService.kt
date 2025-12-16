@@ -14,7 +14,7 @@ import com.google.gson.Gson
 @Service
 @State(
     name = "com.sina.weibo.agent.service.ExtensionStorageService",
-    storages = [Storage("roo-cline-extension-storage.xml")]
+    storages = [Storage("costrict-jetbrains-extension-storage.xml")]
 )
 class ExtensionStorageService() : PersistentStateComponent<ExtensionStorageService> {
     private val gson = Gson()

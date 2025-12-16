@@ -148,7 +148,13 @@ class RPCManager(
         rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadConfiguration, MainThreadConfiguration())
 
         // MainThreadWorkspace
-        rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadWorkspace, project.getService(WorkspaceManager::class.java))
+        val workspaceManager = project.getService(WorkspaceManager::class.java)
+        if (workspaceManager != null) {
+            rpcProtocol.set(ServiceProxyRegistry.MainContext.MainThreadWorkspace, workspaceManager)
+            logger.info("成功注册 MainThreadWorkspace 服务: ${workspaceManager::class.java.simpleName}")
+        } else {
+            logger.error("无法获取 WorkspaceManager 服务，MainThreadWorkspace 注册失败")
+        }
 
     }
 

@@ -96,7 +96,7 @@ object PluginResourceUtil {
      */
     fun extractResourceToTempFile(resourceUrl: java.net.URL, filename: String): String? {
         return try {
-            val tempFile = File.createTempFile("roo-cline-", "-$filename")
+            val tempFile = File.createTempFile("costrict-jetbrains-", "-$filename")
             tempFile.deleteOnExit()
             
             resourceUrl.openStream().use { input ->

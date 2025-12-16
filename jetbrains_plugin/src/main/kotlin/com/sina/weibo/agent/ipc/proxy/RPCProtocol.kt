@@ -683,8 +683,40 @@ class RPCProtocol(
     private suspend fun doInvokeHandler(rpcId: Int, methodName: String, args: List<Any?>): Any? {
         val actor = locals[rpcId]
         if(actor == null) {
-            LOG.error("Unknown actor ${getStringIdentifierForProxy(rpcId)}")
-            return  null
+            val actorName = getStringIdentifierForProxy(rpcId)
+            LOG.error("Unknown actor $actorName (rpcId: $rpcId)")
+            
+            // 特殊处理 MainThreadWorkspace，尝试延迟获取
+            if (actorName == "MainThreadWorkspace") {
+                LOG.warn("尝试延迟获取 MainThreadWorkspace 实例")
+                try {
+                    // 尝试获取当前项目
+                    val projectManager = com.intellij.openapi.project.ProjectManager.getInstance()
+                    val openProjects = projectManager.openProjects
+                    if (openProjects.isNotEmpty()) {
+                        val project = openProjects[0] // 取第一个打开的项目
+                        val workspaceManager = project.getService(com.sina.weibo.agent.core.WorkspaceManager::class.java)
+                        if (workspaceManager != null) {
+                            // 注册到 locals 数组中
+                            locals[rpcId] = workspaceManager
+                            LOG.info("成功延迟注册 MainThreadWorkspace 实例")
+                            // 使用反射调用方法
+                            val method = workspaceManager::class.java.methods.find {
+                                it.name == methodName && it.parameterCount == args.size
+                            }
+                            if (method != null) {
+                                return method.invoke(workspaceManager, *args.toTypedArray())
+                            } else {
+                                LOG.error("找不到匹配的方法: $methodName")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    LOG.error("延迟获取 MainThreadWorkspace 失败", e)
+                }
+            }
+            
+            return null
         }
        // Use reflection to get method with parameter type matching
        val method = try {

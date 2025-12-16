@@ -33,6 +33,7 @@ import com.sina.weibo.agent.extensions.core.ExtensionManager
 import com.sina.weibo.agent.util.ExtensionUtils
 import com.sina.weibo.agent.util.PluginConstants
 import com.sina.weibo.agent.util.PluginResourceUtil
+import com.sina.weibo.agent.env.EnvSnapshotWriter
 import java.io.File
 
 /**
@@ -151,6 +152,13 @@ class WecoderPlugin : StartupActivity.DumbAware {
             }
         } catch (e: Exception) {
             LOG.error("Failed to initialize RunVSAgent plugin", e)
+        } finally {
+            try {
+                EnvSnapshotWriter.ensureSnapshot()
+            }
+            catch(e: Exception) {
+                LOG.error("Failed to write env snapshot", e)
+            }
         }
     }
     
