@@ -238,6 +238,16 @@ setup_submodules() {
     execute_cmd "git submodule init" "submodule init"
     execute_cmd "git submodule update --recursive --depth 10" "submodule update"
     
+    # Configure submodules to fetch all branches and tags (not just main)
+    log_info "Configuring submodules to fetch all remote branches..."
+    cd "$PROJECT_ROOT"
+    for submodule_path in deps/costrict deps/roo-code deps/vscode; do
+        if [[ -d "$submodule_path/.git" ]] || [[ -f "$submodule_path/.git" ]]; then
+            log_debug "Configuring fetch for $submodule_path"
+            git -C "$submodule_path" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*" || true
+        fi
+    done
+    
     # Switch to development branch if specified
     local vscode_dir="$PROJECT_ROOT/$VSCODE_SUBMODULE_PATH"
     if [[ -d "$vscode_dir" ]]; then
