@@ -222,7 +222,8 @@ object EnvSnapshotWriter {
                 file.toPath(),
                 json,
                 StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE_NEW
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
         )
     }
 

@@ -22,6 +22,10 @@ object EnvWhitelist {
         "GIT_",
         "GEMINI_CLI_",
         "ZGSM_",
+        "ANTHROPIC_",
+        "JETBRAINS_",
+        "GEMINI_",
+        "LC_",
         "RUST_"
     )
 
