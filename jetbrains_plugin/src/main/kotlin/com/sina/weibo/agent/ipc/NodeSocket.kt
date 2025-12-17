@@ -105,6 +105,13 @@ class NodeSocket : ISocket {
                             handleSocketError(e)
                         }
                         break
+                    } catch (e: SocketException) {
+                        if (!isDisposed.get()) {
+                            // Handle SocketException separately to provide better handling for Connection reset
+                            logger.warn("Socket[$debugLabel] Socket exception occurred while reading data: ${e.message}")
+                            handleSocketError(e)
+                        }
+                        break
                     }
                 }
             } catch (e: Exception) {
@@ -155,19 +162,34 @@ class NodeSocket : ISocket {
         val errorCode = when {
             error.message?.contains("Broken pipe") == true -> "EPIPE"
             error.message?.contains("Connection reset") == true -> "ECONNRESET"
+            error.message?.contains("Connection timed out") == true -> "ETIMEDOUT"
             else -> null
         }
 
         traceSocketEvent(
             SocketDiagnosticsEventType.ERROR, mapOf(
                 "code" to errorCode,
-                "message" to error.message
+                "message" to error.message,
+                "type" to error::class.simpleName
             )
         )
 
-        // EPIPE errors don't need additional handling, socket will close itself
-        if (errorCode != "EPIPE") {
-            logger.warn("Socket[$debugLabel] Error: ${error.message}", error)
+        // Handle different error codes with appropriate severity
+        when (errorCode) {
+            "EPIPE" -> {
+                // EPIPE is common when remote closes connection, log at debug level
+                logger.debug("Socket[$debugLabel] Connection closed by remote (EPIPE)")
+            }
+            "ECONNRESET" -> {
+                // Connection reset is also common, log at info level rather than error
+                logger.info("Socket[$debugLabel] Connection reset by remote peer (ECONNRESET)")
+            }
+            "ETIMEDOUT" -> {
+                logger.warn("Socket[$debugLabel] Connection timed out (ETIMEDOUT)")
+            }
+            else -> {
+                logger.warn("Socket[$debugLabel] Error: ${error.message}", error)
+            }
         }
 
         // Close Socket
