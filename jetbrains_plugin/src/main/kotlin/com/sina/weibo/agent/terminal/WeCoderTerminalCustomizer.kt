@@ -56,7 +56,7 @@ class WeCoderTerminalCustomizer : LocalTerminalCustomizer() {
  
         // Copy integration files for each shell
         shellConfigs.forEach { (shellType, files) ->
-          val sourceDir = "costrict-jetbrains-shell-integrations/$shellType"
+          val sourceDir = "run-vs-agent-shell-integrations/$shellType"
           val targetDir = Paths.get(shellIntegrationBaseDir, shellType).toString()
  
           // Create target directory
