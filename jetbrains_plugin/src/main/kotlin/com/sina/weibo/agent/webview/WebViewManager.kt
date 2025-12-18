@@ -150,6 +150,95 @@ class WebViewManager(var project: Project) : Disposable, ThemeChangeListener {
     }
     
     /**
+     * Inject environment variables into HTML content
+     * Replace undefined or empty environment variable values with actual environment variables
+     * from idea-shell-env.json or system environment
+     * @param html HTML content
+     * @return HTML content with environment variables injected
+     */
+    private fun injectEnvironmentVariables(html: String): String {
+        var modifiedHtml = html
+        
+        // Try to load from idea-shell-env.json first, then fall back to system env
+        val envMap = loadIdeaShellEnv()
+        
+        val anthropicModel = envMap["ANTHROPIC_MODEL"] ?: System.getenv("ANTHROPIC_MODEL") ?: ""
+        val anthropicBaseUrl = envMap["ANTHROPIC_BASE_URL"] ?: System.getenv("ANTHROPIC_BASE_URL") ?: ""
+        
+        logger.info("Injecting environment variables: ANTHROPIC_MODEL='$anthropicModel', ANTHROPIC_BASE_URL='$anthropicBaseUrl'")
+        
+        // Replace patterns like "ANTHROPIC_MODEL": "undefined" or "ANTHROPIC_MODEL": ""
+        // with actual values from environment variables
+        if (anthropicModel.isNotEmpty()) {
+            modifiedHtml = modifiedHtml.replace(
+                Regex(""""ANTHROPIC_MODEL":\s*"(?:undefined|)""""),
+                """"ANTHROPIC_MODEL": "$anthropicModel""""
+            )
+        }
+        
+        if (anthropicBaseUrl.isNotEmpty()) {
+            modifiedHtml = modifiedHtml.replace(
+                Regex(""""ANTHROPIC_BASE_URL":\s*"(?:undefined|)""""),
+                """"ANTHROPIC_BASE_URL": "$anthropicBaseUrl""""
+            )
+        }
+        
+        return modifiedHtml
+    }
+    
+    /**
+     * Load environment variables from idea-shell-env.json
+     * @return Map of environment variables
+     */
+    private fun loadIdeaShellEnv(): Map<String, String> {
+        try {
+            val envFilePath = resolveIdeaShellEnvPath()
+            if (envFilePath == null || !envFilePath.exists()) {
+                logger.info("idea-shell-env.json not found at: $envFilePath")
+                return emptyMap()
+            }
+            
+            logger.info("Loading environment variables from: $envFilePath")
+            val jsonContent = Files.readString(envFilePath, StandardCharsets.UTF_8)
+            val gson = Gson()
+            val envMap = gson.fromJson(jsonContent, Map::class.java) as? Map<String, String> ?: emptyMap()
+            
+            logger.info("Loaded ${envMap.size} environment variables from idea-shell-env.json")
+            return envMap
+        } catch (e: Exception) {
+            logger.warn("Failed to load idea-shell-env.json", e)
+            return emptyMap()
+        }
+    }
+    
+    /**
+     * Resolve the path to idea-shell-env.json based on platform
+     * @return Path to idea-shell-env.json or null if cannot be determined
+     */
+    private fun resolveIdeaShellEnvPath(): Path? {
+        val filename = "idea-shell-env.json"
+        val osName = System.getProperty("os.name").lowercase()
+        
+        return when {
+            osName.contains("win") -> {
+                // Windows: %LOCALAPPDATA%/idea-shell-env.json
+                val localAppData = System.getenv("LOCALAPPDATA")
+                if (localAppData != null) Paths.get(localAppData, filename) else null
+            }
+            osName.contains("mac") || osName.contains("darwin") -> {
+                // macOS: ~/Library/Caches/idea-shell-env.json
+                val home = System.getProperty("user.home")
+                Paths.get(home, "Library", "Caches", filename)
+            }
+            else -> {
+                // Linux: ~/.cache/idea-shell-env.json
+                val home = System.getProperty("user.home")
+                Paths.get(home, ".cache", filename)
+            }
+        }
+    }
+    
+    /**
      * Register WebView creation callback
      * @param callback Callback object
      * @param disposable Associated Disposable object, used for automatic callback removal
@@ -341,6 +430,9 @@ class WebViewManager(var project: Project) : Disposable, ThemeChangeListener {
 
 
 
+        // Inject environment variables into HTML content
+        // Replace placeholders like "ANTHROPIC_MODEL": "undefined" with actual values
+        data.htmlContent = injectEnvironmentVariables(data.htmlContent)
         logger.info("Received HTML update event: handle=${data.handle}, html length: ${data.htmlContent.length}")
         
         val webView = getLatestWebView()

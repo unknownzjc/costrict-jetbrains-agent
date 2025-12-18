@@ -4,6 +4,7 @@
 
 package com.sina.weibo.agent.core
 
+import com.google.gson.Gson
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -12,16 +13,22 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.SystemInfo
 import com.sina.weibo.agent.plugin.DEBUG_MODE
+import com.sina.weibo.agent.plugin.EnvWhitelist
 import com.sina.weibo.agent.plugin.WecoderPluginService
 import com.sina.weibo.agent.util.PluginResourceUtil
 import com.sina.weibo.agent.util.ProxyConfigUtil
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import com.sina.weibo.agent.util.ExtensionUtils
 import com.sina.weibo.agent.util.PluginConstants
 import com.sina.weibo.agent.util.NotificationUtil
 import com.sina.weibo.agent.util.NodeVersionUtil
 import com.sina.weibo.agent.util.NodeVersion
+import kotlin.io.path.exists
 
 /**
  * Extension process manager
@@ -273,6 +280,25 @@ class ExtensionProcessManager : Disposable {
             LOG.info("Starting extension process with node: $nodePath, entry: $extensionPath")
 
             val envVars = HashMap<String, String>(System.getenv())
+            
+            // Load and apply environment variables from idea-shell-env.json
+            val ideaShellEnv = loadIdeaShellEnv()
+            if (ideaShellEnv.isNotEmpty()) {
+                // Filter environment variables using whitelist
+                val filteredEnv = EnvWhitelist.filter(ideaShellEnv)
+                LOG.info("Loaded ${filteredEnv.size} environment variables from idea-shell-env.json (after filtering)")
+                
+                // Add filtered environment variables to process environment
+                filteredEnv.forEach { (key, value) ->
+                    // Don't override PATH here, we'll handle it separately
+                    if (!key.equals("PATH", ignoreCase = true)) {
+                        envVars[key] = value
+                        LOG.info("Added env var from idea-shell-env.json: $key")
+                    }
+                }
+            } else {
+                LOG.info("No environment variables loaded from idea-shell-env.json")
+            }
             
             // Build complete PATH
             envVars["PATH"] = buildEnhancedPath(envVars, nodePath)
@@ -857,6 +883,59 @@ class ExtensionProcessManager : Disposable {
         }
 
         return pathBuilder.joinToString(File.pathSeparator)
+    }
+    
+    /**
+     * Load environment variables from idea-shell-env.json
+     * @return Map of environment variables
+     */
+    private fun loadIdeaShellEnv(): Map<String, String> {
+        try {
+            val envFilePath = resolveIdeaShellEnvPath()
+            if (envFilePath == null || !envFilePath.exists()) {
+                LOG.info("idea-shell-env.json not found at: $envFilePath")
+                return emptyMap()
+            }
+            
+            LOG.info("Loading environment variables from: $envFilePath")
+            val jsonContent = Files.readString(envFilePath, StandardCharsets.UTF_8)
+            val gson = Gson()
+            @Suppress("UNCHECKED_CAST")
+            val envMap = gson.fromJson(jsonContent, Map::class.java) as? Map<String, String> ?: emptyMap()
+            
+            LOG.info("Loaded ${envMap.size} environment variables from idea-shell-env.json")
+            return envMap
+        } catch (e: Exception) {
+            LOG.warn("Failed to load idea-shell-env.json", e)
+            return emptyMap()
+        }
+    }
+    
+    /**
+     * Resolve the path to idea-shell-env.json based on platform
+     * @return Path to idea-shell-env.json or null if cannot be determined
+     */
+    private fun resolveIdeaShellEnvPath(): Path? {
+        val filename = "idea-shell-env.json"
+        val osName = System.getProperty("os.name").lowercase()
+        
+        return when {
+            osName.contains("win") -> {
+                // Windows: %LOCALAPPDATA%/idea-shell-env.json
+                val localAppData = System.getenv("LOCALAPPDATA")
+                if (localAppData != null) Paths.get(localAppData, filename) else null
+            }
+            osName.contains("mac") || osName.contains("darwin") -> {
+                // macOS: ~/Library/Caches/idea-shell-env.json
+                val home = System.getProperty("user.home")
+                Paths.get(home, "Library", "Caches", filename)
+            }
+            else -> {
+                // Linux: ~/.cache/idea-shell-env.json
+                val home = System.getProperty("user.home")
+                Paths.get(home, ".cache", filename)
+            }
+        }
     }
     
     /**
