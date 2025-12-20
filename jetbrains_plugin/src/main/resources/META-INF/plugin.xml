@@ -67,8 +67,8 @@ It supports users in conducting code checks on functions, selected code lines, c
         
         <h2>Requirements</h2>
         <ul>
-            <li>Requires <a href="https://nodejs.org/">Node.js</a> v18+ installed</li>
-            <li>Requires JetBrains IDE version 2023.1 or later for optimal compatibility</li>
+            <li>Requires <a href="https://nodejs.org/">Node.js</a> v20+ installed</li>
+            <li>Requires JetBrains IDE version 2023.3 or later for optimal compatibility</li>
         </ul>
    ]]></description>
    

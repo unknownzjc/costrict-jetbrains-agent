@@ -35,11 +35,11 @@ We welcome various types of contributions:
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js**: Version 18.0.0 or later
+- **Node.js**: Version 20 or later
 - **npm**: Version 8.0.0 or later (comes with Node.js)
 - **Git**: Any recent version
 - **JDK**: Version 17 or later (for JetBrains plugin development)
-- **JetBrains IDE**: IntelliJ IDEA 2023.1+ (for testing)
+- **JetBrains IDE**: IntelliJ IDEA 2023.3+ (for testing)
 
 ### Optional Tools
 
@@ -847,7 +847,7 @@ A clear and concise description of the bug.
 ## Environment
 - OS: [e.g., macOS 13.0]
 - IDE: [e.g., IntelliJ IDEA 2023.2]
-- Node.js: [e.g., 18.17.0]
+- Node.js: [e.g., 20.0.0]
 - RunVSAgent: [e.g., 1.2.0]
 
 ## Steps to Reproduce

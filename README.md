@@ -42,7 +42,7 @@ Costrict currently supports the following JetBrains IDE series:
 - **Rider** - .NET development
 - **Android Studio** - Android development
 
-> **Note**: Requires JetBrains IDE version 2023.1 or later for optimal compatibility.
+> **Note**: Requires JetBrains IDE version 2023.3 or later for optimal compatibility.
 
 ## 🏗️ Architecture
 
@@ -117,8 +117,8 @@ You can download the pre-built plugin from our GitHub releases page:
 
 #### Prerequisites
 
-- Node.js 18.0+
-- JetBrains IDE 2023.1+
+- Node.js v20+
+- JetBrains IDE 2023.3+
 - Git
 - JDK 17+
 
@@ -180,7 +180,7 @@ Costrict/
 ### Technology Stack
 
 - **Extension Host**: Node.js 18+, TypeScript 5.0+
-- **JetBrains Plugin**: Kotlin 1.8+, IntelliJ Platform 2023.1+
+- **JetBrains Plugin**: Kotlin 1.8+, IntelliJ Platform 2023.3+
 - **Communication**: RPC over Unix Domain Sockets/Named Pipes
 - **Build Tools**: npm/pnpm, Gradle, Shell scripts
 

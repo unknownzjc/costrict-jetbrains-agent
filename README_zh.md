@@ -42,7 +42,7 @@ Costrict 目前支持以下 JetBrains IDE 系列：
 - **Rider** - .NET 开发
 - **Android Studio** - Android 开发
 
-> **注意**：为了获得最佳兼容性，需要 JetBrains IDE 版本 2023.1 或更高版本。
+> **注意**：为了获得最佳兼容性，需要 JetBrains IDE 版本 2023.3 或更高版本。
 
 ## 🏗️ 架构
 
@@ -117,8 +117,8 @@ graph TB
 
 #### 前置条件
 
-- Node.js 18.0+
-- JetBrains IDE 2023.1+
+- Node.js v20+
+- JetBrains IDE 2023.3+
 - Git
 - JDK 17+
 
@@ -180,7 +180,7 @@ Costrict/
 ### 技术栈
 
 - **扩展宿主**：Node.js 18+、TypeScript 5.0+
-- **JetBrains 插件**：Kotlin 1.8+、IntelliJ Platform 2023.1+
+- **JetBrains 插件**：Kotlin 1.8+、IntelliJ Platform 2023.3+
 - **通信**：基于 Unix Domain Sockets/Named Pipes 的 RPC
 - **构建工具**：npm/pnpm、Gradle、Shell 脚本
 
