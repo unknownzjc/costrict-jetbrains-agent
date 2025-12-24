@@ -74,22 +74,19 @@ It supports users in conducting code checks on functions, selected code lines, c
    
    <!-- Change notes for the plugin -->
    <change-notes><![CDATA[
-       <h3>Version 2.0.27</h3>
+       <h3>Version 2.1.3</h3>
         <ul>
-            <li>Add tool result ID validation and fix mechanism to prevent ID mismatch issues in API requests</li>
-            <li>Enhance maxTokens handling in ZgsmAiHandler and SettingsView components</li>
-            <li>Improve code review event handling to prevent duplicate completions</li>
-            <li>Optimize code review mode handling using reset functions for task completion and error states</li>
-            <li>Enhance task error handling by including request IDs in streaming failure messages</li>
-            <li>Add /dotest shortcut command and update mode configuration</li>
-            <li>Reduce maximum non-busy terminal count from 5 to 3</li>
-            <li>Fix disable handling logic in reasoning budget component</li>
-            <li>Unify webview panel identifiers using consistent tabPanelId</li>
-            <li>Add minimum and medium reasoning effort levels for Gemini</li>
-            <li>Filter out non-Anthropic content blocks sent to Vertex API</li>
-            <li>Fix test cases in terminal registry to adapt to new terminal limits</li>
-            <li>Add rehype-sanitize and markdown error handling</li>
-            <li>Sync roocode <a href="https://github.com/zgsm-ai/costrict/commit/f97b5155ac16290865af3016e2b7512e4bc9a389">last commit</a></li>
+            <li>Update error detail copy button with visual indicator (red dot) and improved instructions</li>
+            <li>Enhance error messages for copying error details in English, Chinese (Simplified), and Chinese (Traditional)</li>
+            <li>Fix code review race condition in completion handling by adding async delay to cleanup operations</li>
+            <li>Add partial message check and completion flag to prevent duplicate completion handling in code review</li>
+            <li>Add ask_multiple_choice native tool support for structured user input collection</li>
+            <li>Update gemini-cli model configurations with tool protocol support</li>
+            <li>Update tool protocol resolution logic to prioritize user preferences (XML protocol now takes precedence over native tools)</li>
+            <li>Refactor resolveToolProtocol function with simplified decision tree</li>
+            <li>Update test cases to reflect new tool protocol behavior</li>
+            <li>Add ask_multiple_choice native tool support</li>
+            <li>Sync roocode <a href="https://github.com/zgsm-ai/costrict/commit/1e71015e54e4d6a0feadaa891ff5f56cae3f056b">last commit</a></li>
             <li>Fix known issues</li>
         </ul>
    ]]></change-notes>
