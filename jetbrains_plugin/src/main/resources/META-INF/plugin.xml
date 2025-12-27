@@ -39,7 +39,7 @@ It supports users in conducting code checks on functions, selected code lines, c
                     <li><strong>Code Completion:</strong> Automatically generates subsequent code based on the cursor's context code, quickly outputs code in seconds</li>
                     <li><strong>Vibe Code:</strong> Vibe Code is designed for rapid development and simple tasks. It supports multi-turn natural language dialogue, allowing for real-time refinement and precise code generation.</li>
                     <li><strong>MCP Service:</strong> Seamlessly integrates with the MCP open ecosystem to enable standardized system connectivity. You can Integrate external APIs、Connect to databases、Develop custom tools through MCP services.</li>
-                    <li><strong>APIs & Model Customization:</strong> Officially provided are multiple free advanced models like claude-sonnet-4; it also supports using third-party API providers such as Anthropic, OpenAI, etc.; you can also configure any API compatible with OpenAl; or use local models through I M Studio/Ollama</li>
+                    <li><strong>APIs & Model Customization:</strong> Officially provided are multiple free advanced models; it also supports using third-party API providers such as Anthropic, OpenAI, etc.; you can also configure any API compatible with OpenAl; or use local models through I M Studio/Ollama</li>
                     <li><strong>Mode Customization:</strong> We provide various default modes to adapt to different scenarios, such as the Code mode with outstanding coding capabilities and the Orchestrator mode skilled in complex task decomposition. You can also customize mode according to your needs.</li>
                     <li><strong>Context:</strong> Shenma will automatically incorporate all repository data of large files into the context, and for code completion scenarios, it will also dynamically perceive the context based on the cursor position. You can also add files/folders, terminals, issues, etc. using the @ key to provide more precise context information for the input.</li>
                     <li><strong>Image:</strong> You can click the image icon below the dialog box to upload an image, or you can hold down the Shift key to drag and drop the image into the input box.</li>
@@ -74,21 +74,8 @@ It supports users in conducting code checks on functions, selected code lines, c
    
    <!-- Change notes for the plugin -->
    <change-notes><![CDATA[
-       <h3>Version 2.1.3</h3>
-        <ul>
-            <li>Update error detail copy button with visual indicator (red dot) and improved instructions</li>
-            <li>Enhance error messages for copying error details in English, Chinese (Simplified), and Chinese (Traditional)</li>
-            <li>Fix code review race condition in completion handling by adding async delay to cleanup operations</li>
-            <li>Add partial message check and completion flag to prevent duplicate completion handling in code review</li>
-            <li>Add ask_multiple_choice native tool support for structured user input collection</li>
-            <li>Update gemini-cli model configurations with tool protocol support</li>
-            <li>Update tool protocol resolution logic to prioritize user preferences (XML protocol now takes precedence over native tools)</li>
-            <li>Refactor resolveToolProtocol function with simplified decision tree</li>
-            <li>Update test cases to reflect new tool protocol behavior</li>
-            <li>Add ask_multiple_choice native tool support</li>
-            <li>Sync roocode <a href="https://github.com/zgsm-ai/costrict/commit/1e71015e54e4d6a0feadaa891ff5f56cae3f056b">last commit</a></li>
-            <li>Fix known issues</li>
-        </ul>
+       <h3>Version 2.1.5</h3>
+        <a href="https://github.com/zgsm-ai/costrict/blob/main/CHANGELOG.md">changelog</a>
    ]]></change-notes>
 
     <!-- Product and plugin compatibility requirements.

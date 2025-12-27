@@ -319,6 +319,31 @@ tasks {
         sinceBuild.set(properties("pluginSinceBuild"))
         untilBuild.set("")
     }
+    
+    // 创建任务：动态替换 plugin.xml 中的版本号
+    register("updatePluginXmlVersion") {
+        group = "build"
+        description = "Update version number in plugin.xml change-notes"
+        
+        doLast {
+            println("正在更新 plugin.xml 中的版本号为: ${pluginVersion}")
+            
+            val pluginXmlFile = File("${project.projectDir}/src/main/resources/META-INF/plugin.xml")
+            
+            if (pluginXmlFile.exists()) {
+                val content = pluginXmlFile.readText()
+                val updatedContent = content.replace(
+                    Regex("<h3>Version\\s+[\\d.]+</h3>"),
+                    "<h3>Version ${pluginVersion}</h3>"
+                )
+                
+                if (content != updatedContent) {
+                    pluginXmlFile.writeText(updatedContent)
+                    println("✓ 已更新版本号 (${pluginXmlFile.absolutePath}): ${pluginVersion}")
+                }
+            }
+        }
+    }
 
     runPluginVerifier {
         // 指定要验证的 IDE 版本（使用实际存在的版本）
@@ -400,11 +425,14 @@ tasks {
     // Make prepareSandbox use our relocated instrumented jar
     prepareSandbox {
         dependsOn("relocateInstrumentedJar")
+        
+        // 更新 plugin.xml 中的版本号
+        finalizedBy("updatePluginXmlVersion")
     }
     
     // Also delete the non-instrumented shadowJar before packaging
     buildPlugin {
-        dependsOn("relocateInstrumentedJar")
+        dependsOn("relocateInstrumentedJar", "updatePluginXmlVersion")
         doFirst {
             // Delete the non-instrumented shadowJar to avoid duplicates
             val shadowJarFile = shadowJar.get().archiveFile.get().asFile
