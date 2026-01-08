@@ -5,9 +5,66 @@
 
 set -euo pipefail
 
+# ============================================================================
 # Source common utilities
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
-source "$SCRIPT_DIR/lib/build.sh"
+# ============================================================================
+
+# Determine the absolute path of the directory containing this script
+# This approach is more robust than nested command substitution and works
+# correctly even when the script is sourced from another location
+get_script_dir() {
+    local source="${BASH_SOURCE[0]}"
+    
+    # Resolve $source until the file is no longer a symlink
+    while [ -h "$source" ]; do
+        local dir
+        dir="$(cd -P "$(dirname "$source")" && pwd)"
+        source="$(readlink "$source")"
+        
+        # If $source was a relative symlink, we need to resolve it relative
+        # to the path where the symlink file was located
+        [[ $source != /* ]] && source="$dir/$source"
+    done
+    
+    # Get the absolute path of the directory
+    printf '%s\n' "$(cd -P "$(dirname "$source")" && pwd)"
+}
+
+# Set script directory as a read-only global variable
+readonly SCRIPT_DIR="$(get_script_dir)"
+
+# Source utility functions with error handling
+source_lib_script() {
+    local script_name="$1"
+    local script_path="${SCRIPT_DIR}/${script_name}"
+    
+    # Check if the script exists
+    if [[ ! -f "$script_path" ]]; then
+        printf 'ERROR: Required library script not found: %s\n' "$script_path" >&2
+        printf 'Current working directory: %s\n' "$(pwd)" >&2
+        printf 'Script directory: %s\n' "$SCRIPT_DIR" >&2
+        return 1
+    fi
+    
+    # Source the script and check for errors
+    # shellcheck source=../lib/common.sh
+    if source "$script_path"; then
+        return 0
+    else
+        printf 'ERROR: Failed to source library script: %s\n' "$script_path" >&2
+        return 1
+    fi
+}
+
+# Load common utilities library
+if ! source_lib_script "lib/common.sh"; then
+    exit 1
+fi
+
+# Load build-specific utilities library
+if ! source_lib_script "lib/build.sh"; then
+    exit 1
+fi
 
 # Script configuration
 readonly SCRIPT_NAME="build.sh"
