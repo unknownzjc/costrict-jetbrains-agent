@@ -35,10 +35,24 @@ readonly NODEJS_DOWNLOAD_BASE_URL="https://nodejs.org/dist/v${NODEJS_VERSION}"
 readonly NODEJS_CACHE_DIR="$HOME/.nodejs-cache/${NODEJS_VERSION}"
 
 # Node.js platform mappings
-declare -A NODEJS_PLATFORMS=(
-    ["windows-x64"]="node-v${NODEJS_VERSION}-win-x64.zip"
-    ["linux-x64"]="node-v${NODEJS_VERSION}-linux-x64.tar.xz"
-)
+# NOTE:
+# Do NOT use bash array subscripts for keys like "windows-x64" under `set -u`:
+# some bash contexts treat subscripts as arithmetic and parse it as `windows - x64`,
+# which triggers "windows: unbound variable". Use an explicit mapping function instead.
+get_nodejs_platform_archive_filename() {
+    local platform="$1"
+    case "$platform" in
+        "windows-x64")
+            echo "node-v${NODEJS_VERSION}-win-x64.zip"
+            ;;
+        "linux-x64")
+            echo "node-v${NODEJS_VERSION}-linux-x64.tar.xz"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
 
 # Initialize build environment
 init_build_env() {
@@ -454,12 +468,25 @@ copy_base_debug_resources() {
 
 # Download Node.js binary for a specific platform
 download_nodejs_binary() {
-    local platform="$1"
-    local filename="${NODEJS_PLATFORMS[$platform]}"
+    # Note: This function can be called while the parent script has `set -u` enabled.
+    # Use safe parameter expansion to avoid "unbound variable" crashes and show a clear error.
+    local platform="${1:-}"
+    local supported_platforms
+    supported_platforms="$(get_supported_platforms)"
+    if [[ -z "$platform" ]]; then
+        # Auto-detect current platform when not provided (works with the rest of this script's platform naming)
+        platform="$(get_current_platform)"
+    fi
+    if [[ -z "$platform" ]]; then
+        die "Platform is required (argument missing and auto-detection failed). Supported platforms: ${supported_platforms}"
+    fi
+
+    local filename
+    filename="$(get_nodejs_platform_archive_filename "$platform")"
     
     # Validate platform is supported for pre-built Node.js
     if [[ -z "$filename" ]]; then
-        die "Platform '$platform' is not supported for full plugin build. Supported platforms: ${!NODEJS_PLATFORMS[@]}. Use --lite flag to build lite plugin which supports more platforms via online download."
+        die "Platform '$platform' is not supported for full plugin build. Supported platforms: ${supported_platforms}. Use --lite flag to build lite plugin which supports more platforms via online download."
     fi
     
     local url="$NODEJS_DOWNLOAD_BASE_URL/$filename"
@@ -519,7 +546,9 @@ download_nodejs_binary() {
 download_all_nodejs_binaries() {
     log_step "Downloading Node.js binaries for all platforms..."
 
-    for platform in "${!NODEJS_PLATFORMS[@]}"; do
+    local platforms
+    platforms="$(get_supported_platforms)"
+    for platform in $platforms; do
         download_nodejs_binary "$platform"
     done
 
