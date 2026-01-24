@@ -110,7 +110,16 @@ class OpenEditorAPICommands(val project: Project) {
         val folderURI = createURI(uri)
         logger.info("Opening folder: ${folderURI.path}")
         
-        val folderPath = folderURI.path
+        var folderPath = folderURI.path
+        // On Windows, URI.getPath() might return /C:/path/to/folder
+        // File and Paths.get expect C:/path/to/folder or C:\path\to\folder
+        if (System.getProperty("os.name").lowercase().contains("win") &&
+            folderPath.startsWith("/") && folderPath.length > 2 &&
+            folderPath[1].isLetter() && folderPath[2] == ':'
+        ) {
+            folderPath = folderPath.substring(1)
+        }
+        
         val folderFile = File(folderPath)
         
         // Check if folder exists and is a directory
